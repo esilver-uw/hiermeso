@@ -1,0 +1,129 @@
+---
+title: "Hierarchical Mesoscale"
+author: "Erin Silver"
+date: "2026-02-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(network)
+library(igraph)
+library(abind)
+```
+
+```{r}
+# Write a network generator for the Stochastic Blockmodel
+
+# Take rxr matrix of communities' edge probabilities and labeled n-vector membership list
+# Generate adjacency matrix
+
+sbm <- function(edge_probs, node_members) {
+  adj_matrix <- matrix(0, nrow = length(node_members), ncol = length(node_members))
+  
+  for (i in 1:length(node_members)) {
+    if (i+1 <= length(node_members)){
+      for (j in (i+1):length(node_members)) {
+        adj_matrix[i,j] = rnorm(1, 1, mean = edge_probs[node_members[i],node_members[j]])
+      }
+    }
+  }
+  
+  adj_matrix[lower.tri(adj_matrix)] = t(adj_matrix)[lower.tri(adj_matrix)]
+  return(adj_matrix)
+}
+```
+
+```{r}
+# Given a set of multiresolution communities, create some genuine differences in the structure.
+
+# Take one n-vector membership list. Take also a 3xr assignment matrix that relates the bottom level communities to the top level communities at each level.
+# This will be used to devise the edge probabilities.
+
+assign_matrix <- function(bl_communities) {
+  ml_communities = ceiling(bl_communities / 2)
+  tl_communities = ceiling(ml_communities / 2)
+  
+  return(rbind(tl_communities, ml_communities, bl_communities))
+}
+```
+
+```{r}
+# Create edge probabilities. 
+
+bl_communities = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)
+assign_mrx = assign_matrix(bl_communities)
+
+edge_probs = matrix(0, nrow = length(bl_communities), ncol = length(bl_communities))
+
+for (i in 1:length(unique(assign_mrx[1,]))) {
+  for (j in i:length(unique(assign_mrx[1,]))) {
+    edge_probs[(4*i - 3):(4*i),(4*j - 3):(4*j)] = (sample(10,1) - 1)/10
+  }
+}
+
+for (i in 1:length(unique(assign_mrx[2,]))) {
+  for (j in i:length(unique(assign_mrx[2,]))) {
+    edge_probs[(2*i - 1):(2*i),(2*j - 1):(2*j)] = edge_probs[(2*i - 1):(2*i),(2*j - 1):(2*j)] + (sample(10,1) - 1)/100
+  }
+}
+
+for (i in 1:length(unique(assign_mrx[3,]))) {
+  for (j in i:length(unique(assign_mrx[3,]))) {
+    edge_probs[i,j] = edge_probs[i,j] + (sample(10,1) - 1)/1000
+  }
+}
+
+edge_probs[lower.tri(edge_probs)] = t(edge_probs)[lower.tri(edge_probs)]
+edge_probs = log(edge_probs) - log(1 - edge_probs)
+```
+
+```{r}
+# Create some meaningful differences in alt edge probs
+alt_edge_probs = edge_probs
+alt_edge_probs[5:8,5:8] = sample(1000,1)/1000
+alt_edge_probs[11:12, 9:10] = alt_edge_probs[9:10, 11:12] = sample(1000,1)/1000
+```
+
+```{r}
+m = 100
+node_members = sample(16, 100, replace = T)
+sbm.base = NULL
+sbm.alt = NULL 
+for (i in 1:m) {
+  sbm.base = abind(sbm.base, sbm(edge_probs, node_members), along = 3)
+  sbm.alt = abind(sbm.alt, sbm(alt_edge_probs, node_members), along = 3)
+}
+```
+
+```{r}
+# For S a 2-column matrix of indices, m the number of networks per sample, A1, A2 an array of matrices
+
+e_value <- function(S, A1, A2) {
+  m <- dim(A1)[3]
+  A1_bar <- apply(A1, c(1,2), mean)
+  A2_bar <- apply(A2, c(1,2), mean)
+  return(m / (2 * dim(S)[1]) * sum((A1_bar[S] - A2_bar[S])^2))
+}
+```
+
+```{r}
+# For l a level 1:3, a, b node groups, and given the node membership vector, return S a 2-column matrix of indices
+
+edge_subset <- function(l, a, b, node_members) {
+  # Map to different resolutions
+  a = (2^l*a - (2^l - 1)):2^l*a
+  b = (2^l*b - (2^l - 1)):2^l*b
+  nodes_a = which(node_members %in% a)
+  nodes_b = which(node_members %in% b)
+  return(as.matrix(expand.grid(nodes_a, nodes_b)))
+}
+```
+
+```{r}
+e_value(edge_subset(1, 2, 2, node_members), sbm.base, sbm.alt)
+```
+
