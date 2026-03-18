@@ -17,6 +17,8 @@ library(CVXR)
 ```
 
 ```{r}
+SIGMA <- 10
+
 # Write a network generator for the Stochastic Blockmodel
 
 # Take rxr matrix of communities' edge probabilities and labeled n-vector membership list
@@ -28,7 +30,7 @@ sbm <- function(edge_probs, NODE_MEMBERS) {
   for (i in 1:length(NODE_MEMBERS)) {
     if (i+1 <= length(NODE_MEMBERS)){
       for (j in (i+1):length(NODE_MEMBERS)) {
-        adj_matrix[i,j] = rnorm(1, 1, mean = edge_probs[NODE_MEMBERS[i],NODE_MEMBERS[j]])
+        adj_matrix[i,j] = rnorm(1, mean = edge_probs[NODE_MEMBERS[i],NODE_MEMBERS[j]], sd = SIGMA)
       }
     }
   }
@@ -85,15 +87,17 @@ edge_probs = log(edge_probs) - log(1 - edge_probs)
 ```{r}
 # Create some meaningful differences in alt edge probs
 alt_edge_probs = edge_probs
-alt_edge_probs[5:8,5:8] = sample(1000,1)/1000
-alt_edge_probs[11:12, 9:10] = alt_edge_probs[9:10, 11:12] = sample(1000,1)/1000
+# alt_edge_probs[5:8,5:8] = alt_edge_probs[5:8,5:8] - 50
+alt_edge_probs[1:2,1:2] = alt_edge_probs[1:2,1:2] - 30
+alt_edge_probs[1,1] = alt_edge_probs[1,1] - 20
 ```
 
 ```{r}
-m = 100
+m = 20
 NODE_MEMBERS = sample(16, 100, replace = T)
 SBM_BASE = NULL
 SBM_ALT = NULL 
+
 for (i in 1:m) {
   SBM_BASE = abind(SBM_BASE, sbm(edge_probs, NODE_MEMBERS), along = 3)
   SBM_ALT = abind(SBM_ALT, sbm(alt_edge_probs, NODE_MEMBERS), along = 3)
@@ -107,35 +111,40 @@ e_value <- function(S, A1, A2) {
   m <- dim(A1)[3]
   A1_bar <- apply(A1, c(1,2), mean)
   A2_bar <- apply(A2, c(1,2), mean)
-  return(m / (2 * dim(S)[1]) * sum((A1_bar[S] - A2_bar[S])^2))
+  return(m / (2 * dim(S)[1] * SIGMA^2) * sum((A1_bar[S] - A2_bar[S])^2))
 }
 ```
 
 ```{r}
 # For l a level 1:3 where 3 are the top-level, a, b node groups, and given the node membership vector, return S a 2-column matrix of indices
 
-edge_subset <- function(l, a, b, NODE_MEMBERS) {
-  # Map to different resolutions
-  a = (2^l*a - (2^l - 1)):2^l*a
-  b = (2^l*b - (2^l - 1)):2^l*b
-  nodes_a = which(NODE_MEMBERS %in% a)
-  nodes_b = which(NODE_MEMBERS %in% b)
-  return(as.matrix(expand.grid(nodes_a, nodes_b)))
-}
+# edge_subset <- function(l, a, b, NODE_MEMBERS) {
+#   # Map to different resolutions
+#   a = (2^l*a - (2^l - 1)):2^l*a
+#   b = (2^l*b - (2^l - 1)):2^l*b
+#   nodes_a = which(NODE_MEMBERS %in% a)
+#   nodes_b = which(NODE_MEMBERS %in% b)
+#   return(as.matrix(expand.grid(nodes_a, nodes_b)))
+# }
+
 
 # Wrapper to return e value of A in A.set
 
 e.A <- function(A) {
+  nodes = which(NODE_MEMBERS %in% A[,3:6])
+  edge_subset = as.matrix(expand.grid(nodes, nodes))
+  
   e_vals <- NULL
   for (j in A[3:6]) {
-    e_vals <- append(e_vals, e_value(edge_subset(A[,2], J_SET[j,1], J_SET[j,2], NODE_MEMBERS), SBM_BASE, SBM_ALT))
+    e_vals <- append(e_vals, e_value(edge_subset, SBM_BASE, SBM_ALT))
   }
   mean(e_vals)
 }
 ```
 
 ```{r}
-e_value(edge_subset(1, 2, 2, NODE_MEMBERS), SBM_BASE, SBM_ALT)
+# e_value(edge_subset(1, 2, 2, NODE_MEMBERS), SBM_BASE, SBM_ALT)
+
 ```
 
 ### eLP
@@ -144,8 +153,7 @@ e_value(edge_subset(1, 2, 2, NODE_MEMBERS), SBM_BASE, SBM_ALT)
 library(lpSolve)
 ```
 
-
-Per *Gablenz \& Sabatti*, we seek a vector $\mathbf x_A$ which maximizes $\sum_{A \in \mathcal A} w(A)\mathbf x_A$ subject to $x_A \in \{0,1\}$ and $|\mathcal A| - \alpha e_A\sum_Ax_A \leq |\mathcal A| \times (1 - x_A)$ and $\sum_{A;j}x_A\leq 1$. 
+Per *Gablenz & Sabatti*, we seek a vector $\mathbf x_A$ which maximizes $\sum_{A \in \mathcal A} w(A)\mathbf x_A$ subject to $x_A \in \{0,1\}$ and $|\mathcal A| - \alpha e_A\sum_Ax_A \leq |\mathcal A| \times (1 - x_A)$ and $\sum_{A;j}x_A\leq 1$.
 
 Where $|\mathcal A|$ is the number of hypotheses. Those will be the unique 3-tuples $(l, b, a)$. In this case, that's $\binom 4 2 + \binom 8 2 + \binom {16} 2 + 4 + 8 + 16 = 182$.
 
@@ -173,31 +181,48 @@ j <- J_SET[i]
 # Now devise A.sets:
 A.set <- rbind(expand.grid(1:3, 1:4), expand.grid(1:2, 5:8), expand.grid(1, 9:16))
 A.set <- cbind(A.set, matrix(0, nrow = dim(A.set)[1], ncol = 4))
+A.set <- cbind(A.set, rep(0, dim(A.set)[1]))
 
 for (i in 1:dim(A.set)[1]) {
     A.set[i,3:6] <- matrix((A.set[i,2]) * 2^(A.set[i,1] - 1) - 3:0 %/% 2^(3 - A.set[i,1]))
+} 
+
+e_vals <- rep(0, dim(A.set)[1])
+for (i in 1:dim(A.set)[1]) {
+  e_vals[i] <- e.A(A.set[i,])
 }
 ```
 
 ```{r}
-#e.A 
-e.A(A)
+# 'Location matrix' has columns hypotheses and rows groups, 1 if a hypothesis is in a row.
+loc_mat <- matrix(0, nrow = dim(A.set)[1], ncol = length(J_SET))
+
+for (i in 1:dim(loc_mat)[1]) {
+  for (j in 1:dim(loc_mat)[2]) {
+    if (j %in% A.set[i,3:6]) {
+      loc_mat[i,j] <- 1
+    }
+  }
+}
 ```
-Recall:
-$x_A \in \{0,1\}$ and $|\mathcal A| - \alpha e_A\sum_Ax_A \leq |\mathcal A| \times (1 - x_A)$ and $\sum_{A;j}x_A\leq 1$.
+
+Recall: $x_A \in \{0,1\}$ and $|\mathcal A| - \alpha e_A\sum_Ax_A \leq |\mathcal A| \times (1 - x_A)$ and $\sum_{A;j}x_A\leq 1$.
 
 ```{r}
 # Suppose x.A is a vector of length |A|
 # Devise constraints:
 
+# For each A, two rows: x_A <= 1, -x_A <= 0, force x to be an integer.
 const.7b <- function(x, A) {
   x[A.set == A] == 0 | x[A.set == A] == 1
 }
 
+# For each A, one row.
 const.7c <- function(x, A) {
-  dim(A.set)[1] - alpha * e.a(A) * sum(x) <- dim(A.set)[1] * (1 - x[A.set == A])
+  dim(A.set)[1] - alpha * e.a(A) * sum(x) - dim(A.set)[1] * (1 - x[A.set == A]) <= 0 
 }
 
+# We can use p rows to handle the j: sum of x_A with j in them <= 1
 const.7d <- function(x) {
   for (j in J_SET) {
     if (sum(x[A.set[,3] == j | A.set[,4] == j | A.set[,5] == j | A.set[,6] == j] > 1)) {
@@ -207,6 +232,42 @@ const.7d <- function(x) {
   TRUE
 }
 
-
 ```
 
+Stealing shamelessly from the KeLP github
+
+```{r}
+library(CVXR)
+```
+
+```{r}
+alpha = 0.05
+
+x <- CVXR::Variable(dim(A.set)[1], integer = TRUE)
+objective <- CVXR::Maximize(sum(x))
+
+# We want a matrix with rows j
+
+b <- rep(1, dim(J_SET)[1])
+constraints <- list(x >= 0,
+                    x <= 1,
+                    t(loc_mat) %*% x <= b)
+
+constraints <- c(constraints, list(dim(A.set)[1] - e_vals * alpha * sum(x) <= dim(A.set)[1] * (1 - x)))
+
+problem <- CVXR::Problem(objective = objective, constraints = constraints)
+
+result <- CVXR::solve(problem, solver = 'GLPK')
+
+selections <- as.numeric(result$getValue(x))
+
+# Save information
+for (j in 1:dim(A.set)[1]) {
+  A.set[j,7] <- selections[j]
+}
+  
+detections <- A.set[which(A.set[,7] == 1),]
+detections
+```
+
+Try implementing weights.
