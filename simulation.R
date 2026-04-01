@@ -84,7 +84,7 @@ generate_groups <- function(GROUP_SIZES, n, L) {
   return(list(groups, node_groups, nodes_edge, group_info))
 }
 
-GROUPS <- generate_groups(c(2, 4), 8, 2)
+GROUPS <- generate_groups(c(1, 2, 4), 8, 3)
 
 # Given a group and the two populations, return an e-value.
 # INPUT:
@@ -98,14 +98,16 @@ e_value <- function(A1, A2, groups, g) {
   # Get vector of edges in the group
   res_Group <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
   edges <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
+  # Yield node pairs of the edges in question
+  node_pairs <- groups[[3]][edges,1:2]
   m <- length(edges)
   
   # Because groups are homogeneous across adjacency matrices, we can simply pool both sample sizes (I think?).
   n <- m * dim(A.1)[3]
-  A1_bar <- apply(A1, c(1,2), mean)
-  A2_bar <- apply(A2, c(1,2), mean)
-  s_A1 <- apply(A1, c(1,2), sd)
-  s_A2 <- apply(A2, c(1,2), sd)
+  A1_bar <- apply(A1[node_pairs], c(1,2), mean)
+  A2_bar <- apply(A2[node_pairs], c(1,2), mean)
+  s_A1 <- apply(A1[node_pairs], c(1,2), sd)
+  s_A2 <- apply(A2[node_pairs], c(1,2), sd)
   s_pooled <- sqrt((s_A1^2 + s_A2^2)/n)
   t.stat <- (A1_bar - A2_bar) / s_pooled
   p_value <- pt(t.stat, 2*n - 2)
@@ -116,6 +118,7 @@ e_value <- function(A1, A2, groups, g) {
   return(num/denom)
 }
 
+# TODO: Be able to perturb in a more targeted manner.
 # Apply a perturbation to the parameter adjacency matrix.
 # INPUT:
 # THETA: parameter adjacency matrix.
@@ -157,6 +160,7 @@ create_lcm <- function(groups, n_base_level, n_groups) {
   return(location_constraint_matrix)
 }
 
+# TODO: Implement weighting per Gablenz & Sabatti. 
 # Run eLP
 # INPUT:
 # groups: list of group attributes.
@@ -191,7 +195,8 @@ elp <- function(groups, alpha) {
 }
 
 # Main simulation: iterate over a vector of perturbation SIZES, generating (with set seed) the two populations of networks and applying eLP as implemented above.
-# Output rejection set for each, then display number of rejections and resolution of rejections. Permit selection of group.
+# Output rejection set for each, then display number of rejections and resolution of rejections. Permit selection of group. Try sprinkling equal little signals
+# everywhere and see if increasing them yields different resolution rejections. We want the output to lead to a density plot per resolution. Experiment with weighting.
 # INPUT: 
 # groups: list of group attributes.
 # alpha: alpha level of the test.

@@ -257,7 +257,7 @@ constraints <- c(constraints, list(dim(A.set)[1] - e_vals * alpha * sum(x) <= di
 
 problem <- CVXR::Problem(objective = objective, constraints = constraints)
 
-result <- CVXR::solve(problem, solver = 'GLPK')
+result <- solve(problem, solver = 'HIGHS')
 
 selections <- as.numeric(result$getValue(x))
 
