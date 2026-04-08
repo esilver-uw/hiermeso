@@ -87,7 +87,7 @@ generate_groups <- function(GROUP_SIZES, n, L) {
 GROUPS <- generate_groups(c(1, 2, 4), 8, 3)
 
 sample_network <- function(theta) {
-  print(theta)
+  print(class(theta))
   A <- matrix(NA, nrow = nrow(theta), ncol = ncol(theta))
   for (i in 1:nrow(theta)) {
     for (j in 1:ncol(theta)) {
@@ -220,11 +220,11 @@ elp <- function(e_vals, groups, alpha) {
 simulation <- function(groups, alpha, theta, perturb_g, sizes) {
   # implement
   detections <- NA
+  print(class(theta))
+  A1 <- sample_network(theta = theta)
   for (size in sizes) {
-    print(theta)
     theta_prime <- perturb(theta = theta, groups = groups, g = perturb_g, size = size)
-    print(theta)
-    A1 <- sample_network(theta = theta)
+
     A2 <- sample_network(theta = theta_prime)
     
     e_vals <- NULL
@@ -239,4 +239,5 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes) {
 }
 
 detections <- simulation(GROUPS, 0.05, THETA, "res_1_group_1", c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+class(THETA)
 sample_network(THETA)
