@@ -86,6 +86,17 @@ generate_groups <- function(GROUP_SIZES, n, L) {
 
 GROUPS <- generate_groups(c(1, 2, 4), 8, 3)
 
+sample_network <- function(theta) {
+  print(theta)
+  A <- matrix(NA, nrow = nrow(theta), ncol = ncol(theta))
+  for (i in 1:nrow(theta)) {
+    for (j in 1:ncol(theta)) {
+      A[i,j] = rnorm(1, theta[i,j], SIGMA)
+    }
+  }
+  return(A)
+}
+
 # Given a group and the two populations, return an e-value.
 # INPUT:
 # A.1: array of Adjacency Matrices from the first population.
@@ -103,7 +114,7 @@ e_value <- function(A1, A2, groups, g) {
   m <- length(edges)
   
   # Because groups are homogeneous across adjacency matrices, we can simply pool both sample sizes (I think?).
-  n <- m * dim(A.1)[3]
+  n <- m * dim(A1)[3]
   A1_bar <- apply(A1[node_pairs], c(1,2), mean)
   A2_bar <- apply(A2[node_pairs], c(1,2), mean)
   s_A1 <- apply(A1[node_pairs], c(1,2), sd)
@@ -127,7 +138,7 @@ e_value <- function(A1, A2, groups, g) {
 # size: size and direction of perturbation to apply.
 # OUTPUT:
 # theta_prime: perturbed parameter adjacency matrix.
-perturb <- function(THETA, groups, g, size) {
+perturb <- function(theta, groups, g, size) {
   # Get vector of edges in the group
   res_Group <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
   edges <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
@@ -163,11 +174,12 @@ create_lcm <- function(groups, n_base_level, n_groups) {
 # TODO: Implement weighting per Gablenz & Sabatti. 
 # Run eLP
 # INPUT:
+# e_vals: vector of e_values by aligned with groups
 # groups: list of group attributes.
 # alpha: alpha level of the test.
 # OUTPUT: 
 # detections: hypotheses rejected by the algorithm.
-elp <- function(groups, alpha) {
+elp <- function(e_vals, groups, alpha) {
   # Get number of base level hypotheses and number of total hypotheses
   n_base_level <- length(groups[[4]][groups[[4]]$Resolution == 1,2])
   n_groups <- dim(groups[[4]][,2:3])[1]
@@ -201,12 +213,30 @@ elp <- function(groups, alpha) {
 # groups: list of group attributes.
 # alpha: alpha level of the test.
 # THETA: unperturbed parameter adjacency matrix.
-# g: target group for perturbation.
+# perturb_g: res_Group identifier matching a group in groups.
 # sizes: vector of sizes (including sign for direction) of perturbations.
 # OUTPUT: 
 # detections: list (or something) of sizes & resultant detections.
-simulation <- function(groups, alpha, THETA, g, sizes) {
+simulation <- function(groups, alpha, theta, perturb_g, sizes) {
   # implement
+  detections <- NA
+  for (size in sizes) {
+    print(theta)
+    theta_prime <- perturb(theta = theta, groups = groups, g = perturb_g, size = size)
+    print(theta)
+    A1 <- sample_network(theta = theta)
+    A2 <- sample_network(theta = theta_prime)
+    
+    e_vals <- NULL
+    for (g in groups) {
+      e_vals <- append(e_vals, e_value(theta, theta_prime, groups, g))
+    }
+    
+    detections <- append(detections, elp(e_vals, groups, alpha))
+  }
   
   return(detections)
 }
+
+detections <- simulation(GROUPS, 0.05, THETA, "res_1_group_1", c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+sample_network(THETA)
