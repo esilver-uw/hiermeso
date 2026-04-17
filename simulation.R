@@ -87,7 +87,6 @@ generate_groups <- function(GROUP_SIZES, n, L) {
 GROUPS <- generate_groups(c(1, 2, 4), 8, 3)
 
 sample_network <- function(theta) {
-  print(class(theta))
   A <- matrix(NA, nrow = nrow(theta), ncol = ncol(theta))
   for (i in 1:nrow(theta)) {
     for (j in 1:ncol(theta)) {
@@ -138,14 +137,15 @@ e_value <- function(A1, A2, groups, g) {
 # size: size and direction of perturbation to apply.
 # OUTPUT:
 # theta_prime: perturbed parameter adjacency matrix.
-perturb <- function(theta, groups, g, size) {
+perturb_parameter_matrix <- function(theta, groups, g, size) {
   # Get vector of edges in the group
   res_Group <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
   edges <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
 
   # Apply perturbation
-  theta_prime <- THETA
+  theta_prime <- theta
   theta_prime[edges] <- theta_prime[edges] + size
+  return(theta_prime)
 }
 
 # Create Location Constraint Matrix.
@@ -218,13 +218,11 @@ elp <- function(e_vals, groups, alpha) {
 # OUTPUT: 
 # detections: list (or something) of sizes & resultant detections.
 simulation <- function(groups, alpha, theta, perturb_g, sizes) {
-  # implement
   detections <- NA
-  print(class(theta))
-  A1 <- sample_network(theta = theta)
+  # Iterate over the sizes (magnitude + direction) of perturbations to apply
   for (size in sizes) {
-    theta_prime <- perturb(theta = theta, groups = groups, g = perturb_g, size = size)
-
+    theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size)
+    A1 <- sample_network(theta = theta)
     A2 <- sample_network(theta = theta_prime)
     
     e_vals <- NULL
@@ -239,5 +237,4 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes) {
 }
 
 detections <- simulation(GROUPS, 0.05, THETA, "res_1_group_1", c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
-class(THETA)
 sample_network(THETA)
