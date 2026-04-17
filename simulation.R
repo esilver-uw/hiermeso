@@ -19,6 +19,7 @@ library(Rglpk)
 # Devise globals, including parameter adjacency matrix
 SIGMA <- 10
 N.SIZE <- 64
+N <- 100
 
 # Create parameter adjacency matrix
 set.seed(1970)
@@ -86,11 +87,13 @@ generate_groups <- function(GROUP_SIZES, n, L) {
 
 GROUPS <- generate_groups(c(1, 2, 4), 8, 3)
 
-sample_network <- function(theta) {
-  A <- matrix(NA, nrow = nrow(theta), ncol = ncol(theta))
-  for (i in 1:nrow(theta)) {
-    for (j in 1:ncol(theta)) {
-      A[i,j] = rnorm(1, theta[i,j], SIGMA)
+sample_network <- function(theta, n) {
+  A <- array(NA, c(nrow(theta), ncol(theta), n))
+  for (k in 1:n) {
+    for (i in 1:nrow(theta)) {
+      for (j in 1:ncol(theta)) {
+        A[i,j,k] = rnorm(1, theta[i,j], SIGMA)
+      }
     }
   }
   return(A)
@@ -110,14 +113,15 @@ e_value <- function(A1, A2, groups, g) {
   edges <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
   # Yield node pairs of the edges in question
   node_pairs <- groups[[3]][edges,1:2]
+  print(node_pairs)
   m <- length(edges)
   
   # Because groups are homogeneous across adjacency matrices, we can simply pool both sample sizes (I think?).
   n <- m * dim(A1)[3]
-  A1_bar <- apply(A1[node_pairs], c(1,2), mean)
-  A2_bar <- apply(A2[node_pairs], c(1,2), mean)
-  s_A1 <- apply(A1[node_pairs], c(1,2), sd)
-  s_A2 <- apply(A2[node_pairs], c(1,2), sd)
+  A1_bar <- apply(A1[node_pairs[,1], node_pairs[,2]], c(1,2), mean)
+  A2_bar <- apply(A2[node_pairs[,1], node_pairs[,2]], c(1,2), mean)
+  s_A1 <- apply(A1[node_pairs[,1], node_pairs[,2]], c(1,2), sd)
+  s_A2 <- apply(A2[node_pairs[,1], node_pairs[,2]], c(1,2), sd)
   s_pooled <- sqrt((s_A1^2 + s_A2^2)/n)
   t.stat <- (A1_bar - A2_bar) / s_pooled
   p_value <- pt(t.stat, 2*n - 2)
@@ -161,7 +165,6 @@ create_lcm <- function(groups, n_base_level, n_groups) {
     # Get rows of the group at j
     res_Group <- data.frame(groups[[4]][i,1:2])
     indices <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
-    print(groups[[1]][indices,])
     for (j in 1:dim(location_constraint_matrix)[2]) {
       if (j %in% groups[[1]][indices,1]) {
         location_constraint_matrix[i,j] <- 1
@@ -220,21 +223,45 @@ elp <- function(e_vals, groups, alpha) {
 simulation <- function(groups, alpha, theta, perturb_g, sizes) {
   detections <- NA
   # Iterate over the sizes (magnitude + direction) of perturbations to apply
+  
+  size = 1
+  
+  theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size)
+  A1 <- sample_network(theta = theta, N)
+  A2 <- sample_network(theta = theta_prime, N)
+  
+  e_vals <- NULL
+  for (g in groups[[4]]$res_Group) {
+    e_vals <- append(e_vals, e_value(theta, theta_prime, groups, g))
+  }
+  
+  detections <- append(detections, elp(e_vals, groups, alpha))
+  
   for (size in sizes) {
-    theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size)
-    A1 <- sample_network(theta = theta)
-    A2 <- sample_network(theta = theta_prime)
-    
-    e_vals <- NULL
-    for (g in groups) {
-      e_vals <- append(e_vals, e_value(theta, theta_prime, groups, g))
-    }
-    
-    detections <- append(detections, elp(e_vals, groups, alpha))
+    # theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size)
+    # A1 <- sample_network(theta = theta)
+    # A2 <- sample_network(theta = theta_prime)
+    # 
+    # e_vals <- NULL
+    # for (g in groups[[4]]$res_Group) {
+    #   e_vals <- append(e_vals, e_value(theta, theta_prime, groups, g))
+    # }
+    # 
+    # detections <- append(detections, elp(e_vals, groups, alpha))
   }
   
   return(detections)
 }
 
 detections <- simulation(GROUPS, 0.05, THETA, "res_1_group_1", c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
-sample_network(THETA)
+A1 <- sample_network(THETA, N)
+
+for(g in GROUPS[[4]]$res_Group) {
+  print(g)
+  rg = data.frame(GROUPS[[4]][GROUPS[[4]]$res_Group == g,1:2])
+  print(rg)
+  ej = which(GROUPS[[1]][,rg$Resolution] == rg$Group_Number)
+  print(ej)
+  print(groups[[3]][ej,1:2])
+}
+
