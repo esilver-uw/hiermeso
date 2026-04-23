@@ -113,18 +113,15 @@ e_value <- function(A1, A2, groups, g) {
   edges <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
   # Yield node pairs of the edges in question
   node_pairs <- groups[[3]][edges,1:2]
-  print(node_pairs)
   m <- length(edges)
   
   # Because groups are homogeneous across adjacency matrices, we can simply pool both sample sizes (I think?).
   n <- m * dim(A1)[3]
-  A1_bar <- apply(A1[node_pairs[,1], node_pairs[,2]], c(1,2), mean)
-  A2_bar <- apply(A2[node_pairs[,1], node_pairs[,2]], c(1,2), mean)
-  s_A1 <- apply(A1[node_pairs[,1], node_pairs[,2]], c(1,2), sd)
-  s_A2 <- apply(A2[node_pairs[,1], node_pairs[,2]], c(1,2), sd)
-  s_pooled <- sqrt((s_A1^2 + s_A2^2)/n)
-  t.stat <- (A1_bar - A2_bar) / s_pooled
-  p_value <- pt(t.stat, 2*n - 2)
+  A1_bar <- mean(A1[node_pairs[,1], node_pairs[,2],])
+  A2_bar <- mean(A2[node_pairs[,1], node_pairs[,2],])
+  
+  z.stat <- (A1_bar - A2_bar) / (SIGMA * sqrt(2/n))
+  p_value <- pnorm(z.stat)
   
   # Calibrate p_value to e_value.
   num <- 1 - p_value + p_value * log(p_value)
@@ -201,10 +198,10 @@ elp <- function(e_vals, groups, alpha) {
   
   problem <- CVXR::Problem(objective = objective, constraints = constraints)
   
-  result <- CVXR::solve(problem, solver = 'GLPK')
+  result <- solve(problem, solver = 'GLPK')
   
   selections <- as.numeric(result$getValue(x))
-  detections <- groups[[4]][which(selections == 1)]
+  detections <- groups[[4]][which(selections == 1),]
   
   return(detections)
 }
@@ -218,50 +215,71 @@ elp <- function(e_vals, groups, alpha) {
 # THETA: unperturbed parameter adjacency matrix.
 # perturb_g: res_Group identifier matching a group in groups.
 # sizes: vector of sizes (including sign for direction) of perturbations.
+# selector: 1-4 which attribute is desired (Group_Number, Resolution, group, res_Group)
 # OUTPUT: 
 # detections: list (or something) of sizes & resultant detections.
-simulation <- function(groups, alpha, theta, perturb_g, sizes) {
-  detections <- NA
+simulation <- function(groups, alpha, theta, perturb_g, sizes, selector = 2) {
+  detections <- NULL
   # Iterate over the sizes (magnitude + direction) of perturbations to apply
   
-  size = 1
-  
-  theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size)
-  A1 <- sample_network(theta = theta, N)
-  A2 <- sample_network(theta = theta_prime, N)
-  
-  e_vals <- NULL
-  for (g in groups[[4]]$res_Group) {
-    e_vals <- append(e_vals, e_value(theta, theta_prime, groups, g))
-  }
-  
-  detections <- append(detections, elp(e_vals, groups, alpha))
-  
   for (size in sizes) {
-    # theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size)
-    # A1 <- sample_network(theta = theta)
-    # A2 <- sample_network(theta = theta_prime)
-    # 
-    # e_vals <- NULL
-    # for (g in groups[[4]]$res_Group) {
-    #   e_vals <- append(e_vals, e_value(theta, theta_prime, groups, g))
-    # }
-    # 
-    # detections <- append(detections, elp(e_vals, groups, alpha))
+    theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size)
+    A1 <- sample_network(theta = theta, N)
+    A2 <- sample_network(theta = theta_prime, N)
+    
+    e_vals <- NULL
+    for (g in groups[[4]]$res_Group) {
+      e_vals <- append(e_vals, e_value(A1, A2, groups, g))
+    }
+    
+    detections[[as.character(size)]] <- elp(e_vals, groups, alpha)[,selector]
   }
-  
   return(detections)
 }
 
-detections <- simulation(GROUPS, 0.05, THETA, "res_1_group_1", c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
-A1 <- sample_network(THETA, N)
-
-for(g in GROUPS[[4]]$res_Group) {
-  print(g)
-  rg = data.frame(GROUPS[[4]][GROUPS[[4]]$res_Group == g,1:2])
-  print(rg)
-  ej = which(GROUPS[[1]][,rg$Resolution] == rg$Group_Number)
-  print(ej)
-  print(groups[[3]][ej,1:2])
+# Simulation by groups: iterate over all groups and run main simulation.
+# INPUT: 
+# groups: list of group attributes.
+# alpha: alpha level of the test.
+# THETA: unperturbed parameter adjacency matrix.
+# perturb_g: res_Group identifier matching a group in groups.
+# sizes: vector of sizes (including sign for direction) of perturbations.
+# OUTPUT: 
+# sim_frame: data frame of average rejection resolutions by size and group, with sizes being rows.
+groupwise_sim <- function(groups, alpha, theta, perturb_g, sizes) {
+  sim_frame <- data.frame("Size" = sizes)
+  resolutions <- NULL
+  for (rg in groups[[4]][,4]) {
+    # Use selector = 2 for resolutions
+    detections <- simulation(groups, alpha, theta, rg, sizes, 2)
+    for (i in 1:length(sizes)) {
+      if (length(detections[[i]]) == 0) {
+        resolutions[i] <- -1
+      } else {
+        resolutions[i] <- mean(detections[[i]])
+      }
+    }
+    sim_frame[,rg] <- resolutions
+  }
+  return(sim_frame)
 }
 
+# Simulation plot: Given a data frame of average rejection resolution by size and groups, plot full average rejection resolutions as a spline curve on size across 
+# all groups.
+# INPUT:
+# sim_frame: data frame of average rejection resolutions by size and group, with sizes being rows.
+# OUTPUT: 
+# render curve plot on size across all groups, with y the average rejection resolutions.
+sim_plot <- function(sim_frame) {
+  sim_avgs <- data.frame("Size" = sim_frame$Size, "Avg" = rowMeans(sim_frame[,-1], na.rm = TRUE))
+  print(sim_avgs)
+  sim_avgs[is.nan(sim_avgs$Avg)] <- 0
+  plot(sim_avgs$Size, sim_avgs$Avg)
+}
+
+detections <- groupwise_sim(GROUPS, 0.05, THETA, "res_3_group_2", c(11, 12, 13, 14, 15, 16, 17, 18, 19, 20))
+
+detections[detections == -1] <- 4
+detections[,-1] <- 4 - detections[,-1]
+detections[detections == 0] <- NA
+sim_plot(detections)
