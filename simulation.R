@@ -109,24 +109,29 @@ sample_network <- function(theta, n) {
 # e_value: the e_value associated with the group-wise null hypothesis that A.1 and A.2 are generated from the same parameter matrix.
 e_value <- function(A1, A2, groups, g) {
   # Get vector of edges in the group
-  res_Group <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
-  edges <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
+  res_grp <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
+  edges <- which(groups[[1]][,res_grp$Resolution] == res_grp$Group_Number)
   # Yield node pairs of the edges in question
-  node_pairs <- groups[[3]][edges,1:2]
   m <- length(edges)
   
   # Because groups are homogeneous across adjacency matrices, we can simply pool both sample sizes (I think?).
   n <- m * dim(A1)[3]
-  A1_bar <- mean(A1[node_pairs[,1], node_pairs[,2],])
-  A2_bar <- mean(A2[node_pairs[,1], node_pairs[,2],])
+  A1_bar <- mean(apply(A1, c(1,2), mean)[edges])
+  A2_bar <- mean(apply(A2, c(1,2), mean)[edges]) # For some reason the old formulation didn't work. Probably some silly indexing.
   
   z.stat <- (A1_bar - A2_bar) / (SIGMA * sqrt(2/n))
   p_value <- pnorm(z.stat)
   
   # Calibrate p_value to e_value.
-  num <- 1 - p_value + p_value * log(p_value)
-  denom <- p_value * (-log(p_value))^2
-  return(num/denom)
+  if (p_value != 0) {
+    num <- 1 - p_value + p_value * log(p_value)
+    denom <- p_value * (-log(p_value))^2
+    e_val <- num/denom
+  } else {
+    e_val <- Inf
+  }
+  
+  return(e_val)
 }
 
 # TODO: Be able to perturb in a more targeted manner.
@@ -171,8 +176,8 @@ create_lcm <- function(groups, n_base_level, n_groups) {
   return(location_constraint_matrix)
 }
 
-# TODO: Implement weighting per Gablenz & Sabatti. 
-# Run eLP
+# TODO: Implement weighting per Gablenz & Sabatti.
+# Run eLP: Largely adapted from Gablenz & Sabatti.
 # INPUT:
 # e_vals: vector of e_values by aligned with groups
 # groups: list of group attributes.
@@ -221,32 +226,35 @@ elp <- function(e_vals, groups, alpha) {
 simulation <- function(groups, alpha, theta, perturb_g, sizes, selector = 2) {
   detections <- NULL
   # Iterate over the sizes (magnitude + direction) of perturbations to apply
+  print(perturb_g)
   
   for (size in sizes) {
-    theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size)
+    theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size) # Not the problem
+    
     A1 <- sample_network(theta = theta, N)
-    A2 <- sample_network(theta = theta_prime, N)
+    A2 <- sample_network(theta = theta_prime, N) # Not the problem.
+    # res_Group <- groups[[4]][groups[[4]][,4] == perturb_g,1:2]
+    # print((apply(A1, c(1,2), mean) - apply(A2, c(1,2), mean))[which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)])
     
     e_vals <- NULL
     for (g in groups[[4]]$res_Group) {
       e_vals <- append(e_vals, e_value(A1, A2, groups, g))
     }
-    
+
     detections[[as.character(size)]] <- elp(e_vals, groups, alpha)[,selector]
   }
   return(detections)
 }
 
-# Simulation by groups: iterate over all groups and run main simulation.
+# Simulation by groups: iterate over all groups and run main simulation. Problem: Extremely slow.
 # INPUT: 
 # groups: list of group attributes.
 # alpha: alpha level of the test.
 # THETA: unperturbed parameter adjacency matrix.
-# perturb_g: res_Group identifier matching a group in groups.
 # sizes: vector of sizes (including sign for direction) of perturbations.
 # OUTPUT: 
 # sim_frame: data frame of average rejection resolutions by size and group, with sizes being rows.
-groupwise_sim <- function(groups, alpha, theta, perturb_g, sizes) {
+groupwise_sim <- function(groups, alpha, theta, sizes) {
   sim_frame <- data.frame("Size" = sizes)
   resolutions <- NULL
   for (rg in groups[[4]][,4]) {
@@ -268,16 +276,24 @@ groupwise_sim <- function(groups, alpha, theta, perturb_g, sizes) {
 # all groups.
 # INPUT:
 # sim_frame: data frame of average rejection resolutions by size and group, with sizes being rows.
-# OUTPUT: 
+# OUTPUT:
 # render curve plot on size across all groups, with y the average rejection resolutions.
 sim_plot <- function(sim_frame) {
   sim_avgs <- data.frame("Size" = sim_frame$Size, "Avg" = rowMeans(sim_frame[,-1], na.rm = TRUE))
+  sim_avgs[is.nan(sim_avgs$Avg),2] <- 0
   print(sim_avgs)
-  sim_avgs[is.nan(sim_avgs$Avg)] <- 0
   plot(sim_avgs$Size, sim_avgs$Avg)
 }
 
-detections <- groupwise_sim(GROUPS, 0.05, THETA, "res_3_group_2", c(11, 12, 13, 14, 15, 16, 17, 18, 19, 20))
+# Naïve Baseline Pattern: the baseline method is only looking at highest resolution rejections. We want to show that there's a range of signals where we're
+# finding something more because we're looking at multiple resolutions. We could use that as a comparator.
+# Consider treating all the resolutions at once and doing multiple testing that accounts for dependence: Throw all of the p-values into an FDR procedure without
+# the linear programming, using dependence methods.
+
+# Try sizes approx. sigma
+
+set.seed(1995)
+detections <- groupwise_sim(GROUPS, 0.05, THETA, c(1,2,3,4,5,6,7))
 
 detections[detections == -1] <- 4
 detections[,-1] <- 4 - detections[,-1]
