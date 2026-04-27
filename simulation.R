@@ -19,7 +19,7 @@ library(Rglpk)
 # Devise globals, including parameter adjacency matrix
 SIGMA <- 10
 N.SIZE <- 64
-N <- 100
+N <- 20
 
 # Create parameter adjacency matrix
 set.seed(1970)
@@ -290,7 +290,7 @@ sim_plot <- function(sim_frame) {
 # Consider treating all the resolutions at once and doing multiple testing that accounts for dependence: Throw all of the p-values into an FDR procedure without
 # the linear programming, using dependence methods.
 
-# Try sizes approx. sigma
+# Try sizes approx. sigma. Curiously, seems to prefer rejecting when neighbours also have rejections.
 
 set.seed(1995)
 detections <- groupwise_sim(GROUPS, 0.05, THETA, c(1,2,3,4,5,6,7))
@@ -298,4 +298,11 @@ detections <- groupwise_sim(GROUPS, 0.05, THETA, c(1,2,3,4,5,6,7))
 detections[detections == -1] <- 4
 detections[,-1] <- 4 - detections[,-1]
 detections[detections == 0] <- NA
+for (i in 1:nrow(detections)) {
+  for (j in 2:ncol(detections)) {
+    if (is.na(detections[i,j])) { 
+      detections[i,j] = 0
+    }
+  }
+}
 sim_plot(detections)
