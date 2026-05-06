@@ -15,6 +15,7 @@ library(igraph)
 library(abind)
 library(CVXR)
 library(Rglpk)
+library(parallel)
 
 # Devise globals, including parameter adjacency matrix
 SIGMA <- 10
@@ -147,7 +148,7 @@ perturb_parameter_matrix <- function(theta, groups, g, size) {
   # Get vector of edges in the group
   res_Group <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
   edges <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
-
+  
   # Apply perturbation
   theta_prime <- theta
   theta_prime[edges] <- theta_prime[edges] + size
@@ -240,7 +241,7 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, selector = 2) {
     for (g in groups[[4]]$res_Group) {
       e_vals <- append(e_vals, e_value(A1, A2, groups, g))
     }
-
+    
     detections[[as.character(size)]] <- elp(e_vals, groups, alpha)[,selector]
   }
   return(detections)
@@ -292,17 +293,13 @@ sim_plot <- function(sim_frame) {
 
 # Try sizes approx. sigma. Curiously, seems to prefer rejecting when neighbours also have rejections.
 
-set.seed(1995)
-detections <- groupwise_sim(GROUPS, 0.05, THETA, c(1,2,3,4,5,6,7))
-
-detections[detections == -1] <- 4
-detections[,-1] <- 4 - detections[,-1]
-detections[detections == 0] <- NA
-for (i in 1:nrow(detections)) {
-  for (j in 2:ncol(detections)) {
-    if (is.na(detections[i,j])) { 
-      detections[i,j] = 0
-    }
-  }
+# Multicore wrapper. 
+mc_sim_study <- function(seed, groups, alpha, theta, sizes) {
+  set.seed(seed)
+  detections <- groupwise_sim(groups, alpha, theta, sizes)
 }
-sim_plot(detections)
+
+SIZES <- seq(0.5, 10, 0.5)
+SEEDS <- 1:1000
+
+detex <- mclapply(SEEDS, mc_sim_study, groups = GROUPS, alpha = 0.05, theta = THETA, sizes = SIZES)
