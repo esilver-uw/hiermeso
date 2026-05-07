@@ -19,8 +19,9 @@ library(parallel)
 
 # Devise globals, including parameter adjacency matrix
 SIGMA <- 10
-N.SIZE <- 64
+N.SIZE <- 8
 N <- 20
+GROUP.SIZES <- c(1,2,4)
 
 # Create parameter adjacency matrix
 set.seed(1970)
@@ -36,23 +37,15 @@ THETA[lower.tri(THETA)] = t(THETA)[lower.tri(THETA)]
 # INPUT:
 # GROUP_SIZES: vector of group sizes.
 # n: number of nodes.
-# L: number of levels.
 # OUTPUT:
+# for L length of GROUP_SIZES
 # groups: data frame of dimension n^2 x L specifying group membership for each possible edge.
 # node_groups: data frame of dimension n x L specifying node-group membership for each node.
 # nodes_edge: data frame of dimension n^2 x 3 linking node pairs to edges.
 # group_info: data frame containing group, level, and group-level for each group.
-generate_groups <- function(GROUP_SIZES, n, L) {
-  node_groups <- matrix(0, n, L)
-  for (l in 1:L) {
-    node_groups[,l] <- rep(1:(n/GROUP_SIZES[l]), each = GROUP_SIZES[l])
-  }
-  
-  # nodes_edge
-  node_groups <- matrix(0, n, L)
-  for (l in 1:L) {
-    node_groups[,l] <- rep(1:(n/GROUP_SIZES[l]), each = GROUP_SIZES[l])
-  }
+generate_groups <- function(GROUP_SIZES, n) {
+  # number of levels
+  L <- length(GROUP_SIZES)
   
   # nodes_edge
   nodes_edge <- cbind(expand.grid(1:n, 1:n), 1:n^2)
@@ -83,10 +76,23 @@ generate_groups <- function(GROUP_SIZES, n, L) {
     group_info <- rbind(group_info, df_temp)
   }
   
-  return(list(groups, node_groups, nodes_edge, group_info))
+  group_subgroups <- NULL
+  
+  for (g in group_info$res_Group) {
+    subgroups <- NULL
+    group <- group_info$Group_Number[group_info$res_Group == g]
+    res <- group_info$Resolution[group_info$res_Group == g]
+    for (i in 1:res) {
+      subgroups_i <- unique(paste0("group_",groups[groups[,res] == group, i]))
+      subgroups <- append(subgroups, paste0("res_",i,"_",subgroups_i))
+    }
+    group_subgroups[[g]] <- subgroups
+  }
+  
+  return(list(groups, group_subgroups, nodes_edge, group_info))
 }
 
-GROUPS <- generate_groups(c(1, 2, 4), 8, 3)
+GROUPS <- generate_groups(GROUP.SIZES, N.SIZE)
 
 sample_network <- function(theta, n) {
   A <- array(NA, c(nrow(theta), ncol(theta), n))
@@ -166,13 +172,9 @@ create_lcm <- function(groups, n_base_level, n_groups) {
   location_constraint_matrix <- matrix(0, n_groups, n_base_level)
   for (i in 1:dim(location_constraint_matrix)[1]) {
     # Get rows of the group at j
-    res_Group <- data.frame(groups[[4]][i,1:2])
-    indices <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
-    for (j in 1:dim(location_constraint_matrix)[2]) {
-      if (j %in% groups[[1]][indices,1]) {
-        location_constraint_matrix[i,j] <- 1
-      }
-    }
+    res_Group <- groups[[4]][i,4]
+    indices <- which(groups[[4]][groups[[4]]$Resolution == 1,4] %in% groups[[2]][[res_Group]])
+    location_constraint_matrix[i,indices] <- 1
   }
   return(location_constraint_matrix)
 }
@@ -188,7 +190,7 @@ create_lcm <- function(groups, n_base_level, n_groups) {
 elp <- function(e_vals, groups, alpha) {
   # Get number of base level hypotheses and number of total hypotheses
   n_base_level <- length(groups[[4]][groups[[4]]$Resolution == 1,2])
-  n_groups <- dim(groups[[4]][,2:3])[1]
+  n_groups <- dim(groups[[4]])[1]
   
   x <- CVXR::Variable(n_groups, integer = TRUE)
   objective <- CVXR::Maximize(sum(x))
@@ -221,14 +223,12 @@ elp <- function(e_vals, groups, alpha) {
 # THETA: unperturbed parameter adjacency matrix.
 # perturb_g: res_Group identifier matching a group in groups.
 # sizes: vector of sizes (including sign for direction) of perturbations.
-# selector: 1-4 which attribute is desired (Group_Number, Resolution, group, res_Group)
+# valid: output only true detections?
 # OUTPUT: 
 # detections: list (or something) of sizes & resultant detections.
-simulation <- function(groups, alpha, theta, perturb_g, sizes, selector = 2) {
+simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T) {
   detections <- NULL
   # Iterate over the sizes (magnitude + direction) of perturbations to apply
-  print(perturb_g)
-  
   for (size in sizes) {
     theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size) # Not the problem
     
@@ -242,7 +242,14 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, selector = 2) {
       e_vals <- append(e_vals, e_value(A1, A2, groups, g))
     }
     
-    detections[[as.character(size)]] <- elp(e_vals, groups, alpha)[,selector]
+    elp_detex <- elp(e_vals, groups, alpha)[,4]
+    
+    # If toggled, include only the true detections.
+    if (valid) {
+      elp_detex <- intersect(elp_detex, groups[[2]][[perturb_g]])
+    }
+    
+    detections[[as.character(size)]] <- elp_detex
   }
   return(detections)
 }
@@ -302,4 +309,4 @@ mc_sim_study <- function(seed, groups, alpha, theta, sizes) {
 SIZES <- seq(0.5, 10, 0.5)
 SEEDS <- 1:1000
 
-detex <- mclapply(SEEDS, mc_sim_study, groups = GROUPS, alpha = 0.05, theta = THETA, sizes = SIZES)
+# detex <- mclapply(SEEDS, mc_sim_study, groups = GROUPS, alpha = 0.05, theta = THETA, sizes = SIZES)
