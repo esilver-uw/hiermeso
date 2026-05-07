@@ -92,8 +92,6 @@ generate_groups <- function(GROUP_SIZES, n) {
   return(list(groups, group_subgroups, nodes_edge, group_info))
 }
 
-GROUPS <- generate_groups(GROUP.SIZES, N.SIZE)
-
 sample_network <- function(theta, n) {
   A <- array(NA, c(nrow(theta), ncol(theta), n))
   for (k in 1:n) {
@@ -196,11 +194,15 @@ elp <- function(e_vals, groups, alpha) {
   objective <- CVXR::Maximize(sum(x))
   
   location_constraint_matrix <- create_lcm(groups, n_base_level, n_groups)
+  print(location_constraint_matrix)
   
   b <- rep(1, n_base_level)
   constraints <- list(x >= 0,
                       x <= 1,
                       t(location_constraint_matrix) %*% x <= b)
+  
+  print(length(constraints))
+  print(length(list(n_groups - e_vals * alpha * sum(x) <= n_groups * (1 - x))))
   
   constraints <- c(constraints, list(n_groups - e_vals * alpha * sum(x) <= n_groups * (1 - x)))
   
@@ -224,9 +226,10 @@ elp <- function(e_vals, groups, alpha) {
 # perturb_g: res_Group identifier matching a group in groups.
 # sizes: vector of sizes (including sign for direction) of perturbations.
 # valid: output only true detections?
+# comparator: group set to compare
 # OUTPUT: 
 # detections: list (or something) of sizes & resultant detections.
-simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T) {
+simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T, comparator = NULL) {
   detections <- NULL
   # Iterate over the sizes (magnitude + direction) of perturbations to apply
   for (size in sizes) {
@@ -250,7 +253,23 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T) {
     }
     
     detections[[as.character(size)]] <- elp_detex
+    
+    # Base level 
+    if (!is.null(comparator)) {
+      elp_detex_comp <- elp(e_vals, comparator, alpha)[,4]
+      
+      if (valid) {
+        elp_detex_comp <- intersect(elp_detex_comp, groups[[2]][[perturb_g]])
+      }
+      
+      detections_comp[[as.character(size)]] <- elp_detex_comp
+    }
   }
+  
+  if (!is.null(comparator)) {
+    return(detections, detections_comp)
+  }
+  
   return(detections)
 }
 
@@ -305,6 +324,10 @@ mc_sim_study <- function(seed, groups, alpha, theta, sizes) {
   set.seed(seed)
   detections <- groupwise_sim(groups, alpha, theta, sizes)
 }
+
+GROUPS <- generate_groups(GROUP.SIZES, N.SIZE)
+GROUPS_COMP <- generate_groups(1, N.SIZE)
+simulation(GROUPS, 0.05, THETA, "res_3_group_1", 5, T, GROUPS_COMP)
 
 SIZES <- seq(0.5, 10, 0.5)
 SEEDS <- 1:1000
