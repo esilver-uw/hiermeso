@@ -194,15 +194,11 @@ elp <- function(e_vals, groups, alpha) {
   objective <- CVXR::Maximize(sum(x))
   
   location_constraint_matrix <- create_lcm(groups, n_base_level, n_groups)
-  print(location_constraint_matrix)
   
   b <- rep(1, n_base_level)
   constraints <- list(x >= 0,
                       x <= 1,
                       t(location_constraint_matrix) %*% x <= b)
-  
-  print(length(constraints))
-  print(length(list(n_groups - e_vals * alpha * sum(x) <= n_groups * (1 - x))))
   
   constraints <- c(constraints, list(n_groups - e_vals * alpha * sum(x) <= n_groups * (1 - x)))
   
@@ -231,6 +227,9 @@ elp <- function(e_vals, groups, alpha) {
 # detections: list (or something) of sizes & resultant detections.
 simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T, comparator = NULL) {
   detections <- NULL
+  if (!is.null(comparator)) {
+    detections_comp <- NULL
+  }
   # Iterate over the sizes (magnitude + direction) of perturbations to apply
   for (size in sizes) {
     theta_prime <- perturb_parameter_matrix(theta = theta, groups = groups, g = perturb_g, size = size) # Not the problem
@@ -256,7 +255,12 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T, compar
     
     # Base level 
     if (!is.null(comparator)) {
-      elp_detex_comp <- elp(e_vals, comparator, alpha)[,4]
+      e_vals_comp <- NULL
+      for (g in comparator[[4]]$res_Group) {
+        e_vals_comp <- append(e_vals_comp, e_value(A1, A2, comparator, g))
+      }
+      
+      elp_detex_comp <- elp(e_vals_comp, comparator, alpha)[,4]
       
       if (valid) {
         elp_detex_comp <- intersect(elp_detex_comp, groups[[2]][[perturb_g]])
@@ -267,7 +271,7 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T, compar
   }
   
   if (!is.null(comparator)) {
-    return(detections, detections_comp)
+    return(list(detections, detections_comp))
   }
   
   return(detections)
@@ -282,6 +286,33 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T, compar
 # OUTPUT: 
 # sim_frame: data frame of average rejection resolutions by size and group, with sizes being rows.
 groupwise_sim <- function(groups, alpha, theta, sizes) {
+  sim_frame <- data.frame("Size" = sizes)
+  resolutions <- NULL
+  for (rg in groups[[4]][,4]) {
+    # Use selector = 2 for resolutions
+    detections <- simulation(groups, alpha, theta, rg, sizes, 2)
+    for (i in 1:length(sizes)) {
+      if (length(detections[[i]]) == 0) {
+        resolutions[i] <- -1
+      } else {
+        resolutions[i] <- mean(detections[[i]])
+      }
+    }
+    sim_frame[,rg] <- resolutions
+  }
+  return(sim_frame)
+}
+
+# Simulation by groups with comparator: iterate over all groups and run main simulation. Problem: Extremely slow.
+# TODO: make this done lol.
+# INPUT: 
+# groups: list of group attributes.
+# alpha: alpha level of the test.
+# THETA: unperturbed parameter adjacency matrix.
+# sizes: vector of sizes (including sign for direction) of perturbations.
+# OUTPUT: 
+# sim_frame: data frame of average rejection resolutions by size and group, with sizes being rows.
+groupwise_sim_comp <- function(groups, alpha, theta, sizes) {
   sim_frame <- data.frame("Size" = sizes)
   resolutions <- NULL
   for (rg in groups[[4]][,4]) {
