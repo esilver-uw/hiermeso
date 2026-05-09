@@ -428,20 +428,21 @@ groupwise_sim <- function(groups, alpha, theta, sizes) {
 # sim_frame[[3]]: data frame of whether any rejection was made using base groups only.
 groupwise_sim_comp <- function(groups, alpha, theta, sizes, groups_comp) {
   sim_frames <- NULL
-  for (i in 1:3) {
+  for (i in 1:4) {
     sim_frames[[i]] <- data.frame("Size" = sizes)
   }
   
   resolutions <- NULL
   detex <- NULL
   detex_comp <- NULL
+  detex_p_bh_comp <- NULL
   # Take rejection resolutions
   for (rg in groups[[4]][,4]) {
     # Use selector = 2 for resolutions
     detex_list <- simulation(groups, alpha, theta, rg, sizes, 2, comparator = groups_comp)
     detections <- detex_list[[1]]
     detections_comp <- detex_list[[2]]
-    print(detections)
+    detections_p_bh_comp <- detex_list[[3]]
     
     for (i in 1:length(sizes)) {
       if (length(detections[[i]]) == 0) {
@@ -458,10 +459,16 @@ groupwise_sim_comp <- function(groups, alpha, theta, sizes, groups_comp) {
       } else {
         detex_comp[i] <- 1
       }
+      if (length(detections_p_bh_comp[[i]] == 0)) {
+        detex_p_bh_comp <- 0
+      } else {
+        detex_p_bh_comp <- 1
+      }
     }
     sim_frames[[1]][,rg] <- resolutions
     sim_frames[[2]][,rg] <- detex
     sim_frames[[3]][,rg] <- detex_comp
+    sim_frames[[4]][,rg] <- detex_p_bh_comp
   }
   return(sim_frames)
 }
@@ -496,17 +503,25 @@ GROUPS <- generate_groups(GROUP.SIZES, N.SIZE)
 GROUPS_COMP <- generate_groups(1, N.SIZE)
 
 SIZES <- seq(0.5, 10, 0.5)
-SEEDS <- 1:1000
+SEEDS <- 1:100
 
 sim_frames <- mclapply(SEEDS, mc_sim_study, groups = GROUPS, alpha = 0.05, theta = THETA, sizes = SIZES, groups_comp = GROUPS_COMP)
 resolutions <- sim_frames[[1]][[1]]
 detex <- sim_frames[[1]][[2]]
 detex_comp <- sim_frames[[1]][[3]]
+detex_p_bh_comp <- sim_frames[[1]][[4]]
 for (i in 2:length(sim_frames)) {
   resolutions <- resolutions + sim_frames[[i]][[1]]
   detex <- detex + sim_frames[[i]][[2]]
   detex_comp <- detex_comp + sim_frames[[i]][[3]]
+  detex_p_bh_comp <- detex_p_bh_comp + sim_frames[[i]][[4]]
 }
 res_mean <- resolutions / length(sim_frames)
 detex_mean <- detex / length(sim_frames)
 detex_comp_mean <- detex_comp / length(sim_frames)
+detex_p_bh_comp_mean <- detex_p_bh_comp / length(sim_frames)
+
+write.csv2(res_mean, "resolution_mean.csv")
+write.csv2(detex_mean, "detections_mean.csv")
+write.csv2(detex_comp_mean, "detections_comparator_mean.csv")
+write.csv2(detex_p_bh_comp_mean, "detections_p_bh_comp_mean.csv")
