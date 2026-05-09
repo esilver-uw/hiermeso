@@ -19,9 +19,9 @@ library(parallel)
 
 # Devise globals, including parameter adjacency matrix
 SIGMA <- 10
-N.SIZE <- 8
+N.SIZE <- 64
 N <- 20
-GROUP.SIZES <- c(1,2,4)
+GROUP.SIZES <- c(8,16,32)
 
 # Create parameter adjacency matrix
 set.seed(1970)
@@ -104,6 +104,87 @@ sample_network <- function(theta, n) {
   return(A)
 }
 
+# Create groups for upper triangle, inspired by KeLP architecture.
+# INPUT:
+# GROUP_SIZES: vector of group sizes.
+# n: number of nodes.
+# OUTPUT:
+# for L length of GROUP_SIZES
+# groups: data frame of dimension n^2 x L specifying group membership for each possible edge.
+# node_groups: data frame of dimension n x L specifying node-group membership for each node.
+# nodes_edge: data frame of dimension n^2 x 3 linking node pairs to edges.
+# group_info: data frame containing group, level, and group-level for each group.
+generate_groups <- function(GROUP_SIZES, n) {
+  # number of levels
+  L <- length(GROUP_SIZES)
+  
+  # nodes_edge
+  nodes_edge <- NULL
+  for (i in 1:n) {
+    for (j in i:n) {
+      nodes_edge <- rbind(nodes_edge, c(i,j))
+    }
+  }
+  
+  # groups will be all combinations of node_groups. 
+  groups <- NULL
+  groups <- cbind(matrix(0, n^2, L), expand.grid(1:n,1:n))
+  for (l in 1:L) {
+    index <- 1
+    for (i in 1:(n/GROUP_SIZES[l])) {
+      i_valid <- (i*GROUP_SIZES[l]) + 1 - 1:GROUP_SIZES[l]
+      for (j in i:(n/GROUP_SIZES[l])) {
+        # Group size is tolerance frame. If
+        j_valid <- (j*GROUP_SIZES[l]) + 1 - 1:GROUP_SIZES[l]
+        # groups[(nodes_edge[,1] %in% i_valid & nodes_edge[,2] %in% j_valid) | (nodes_edge[,1] %in% j_valid & nodes_edge[,2] %in% i_valid),l] <- index
+        groups[(nodes_edge[,1] %in% i_valid & nodes_edge[,2] %in% j_valid),l] <- index
+        index <- index + 1
+      }
+    }
+  }
+  
+  # me caveman. me de-duplicate up to ordering.
+  groups <- groups[groups[,L+1] %in% nodes_edge[,1] & groups[,L+2] %in% nodes_edge[,2],1:3]
+  
+  group_info <- c()
+  
+  for (l in 1:L) {
+    df_temp <- data.frame("Group_Number" = unique(groups[,l]))
+    df_temp$Resolution <- l
+    df_temp$group <- paste0("group_", df_temp$Group_Number)
+    df_temp$res_Group <- paste0("res_",df_temp$Resolution, "_", df_temp$group)
+    
+    group_info <- rbind(group_info, df_temp)
+  }
+  
+  group_subgroups <- NULL
+  
+  for (g in group_info$res_Group) {
+    subgroups <- NULL
+    group <- group_info$Group_Number[group_info$res_Group == g]
+    res <- group_info$Resolution[group_info$res_Group == g]
+    for (i in 1:res) {
+      subgroups_i <- unique(paste0("group_",groups[groups[,res] == group, i]))
+      subgroups <- append(subgroups, paste0("res_",i,"_",subgroups_i))
+    }
+    group_subgroups[[g]] <- subgroups
+  }
+  
+  return(list(groups, group_subgroups, nodes_edge, group_info))
+}
+
+sample_network <- function(theta, n) {
+  A <- array(NA, c(nrow(theta), ncol(theta), n))
+  for (k in 1:n) {
+    for (i in 1:nrow(theta)) {
+      for (j in 1:ncol(theta)) {
+        A[i,j,k] = rnorm(1, theta[i,j], SIGMA)
+      }
+    }
+  }
+  return(A)
+}
+
 # Given a group and the two populations, return an e-value.
 # INPUT:
 # A.1: array of Adjacency Matrices from the first population.
@@ -111,8 +192,8 @@ sample_network <- function(theta, n) {
 # groups: list of group attributes.
 # g: res_Group identifier matching a group in groups.
 # OUTPUT: 
-# e_value: the e_value associated with the group-wise null hypothesis that A.1 and A.2 are generated from the same parameter matrix.
-e_value <- function(A1, A2, groups, g) {
+# p_value: the p_value associated with the group-wise null hypothesis that A.1 and A.2 are generated from the same parameter matrix.
+p_value <- function(A1, A2, groups, g) {
   # Get vector of edges in the group
   res_grp <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
   edges <- which(groups[[1]][,res_grp$Resolution] == res_grp$Group_Number)
@@ -127,16 +208,26 @@ e_value <- function(A1, A2, groups, g) {
   z.stat <- (A1_bar - A2_bar) / (SIGMA * sqrt(2/n))
   p_value <- pnorm(z.stat)
   
-  # Calibrate p_value to e_value.
-  if (p_value != 0) {
+  return(p_value)
+}
+
+# Calibrate p_value to e_value.
+# INPUT:
+# p_value: a p_value, perhaps associated with the group-wise null hypothesis that A.1 and A.2 are generated from the same parameter matrix.
+# OUTPUT: 
+# e_value: an e_value calibrated from that p_value.
+e_value <- function(p_value) {
+  if (p_value > 0 & p_value < 1) {
     num <- 1 - p_value + p_value * log(p_value)
     denom <- p_value * (-log(p_value))^2
-    e_val <- num/denom
-  } else {
-    e_val <- Inf
+    e_value <- num/denom
+  } else if (p_value == 0) {
+    e_value <- Inf
+  } else if (p_value == 1) {
+    e_value <- 0.5
   }
   
-  return(e_val)
+  return(e_value)
 }
 
 # TODO: Be able to perturb in a more targeted manner.
@@ -225,10 +316,11 @@ elp <- function(e_vals, groups, alpha) {
 # comparator: group set to compare
 # OUTPUT: 
 # detections: list (or something) of sizes & resultant detections.
-simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T, comparator = NULL) {
+simulation <- function(groups, alpha, theta, perturb_g, sizes, comparator = NULL, valid = T) {
   detections <- NULL
   if (!is.null(comparator)) {
     detections_comp <- NULL
+    detections_p_bh_comp <- NULL
   }
   # Iterate over the sizes (magnitude + direction) of perturbations to apply
   for (size in sizes) {
@@ -241,7 +333,8 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T, compar
     
     e_vals <- NULL
     for (g in groups[[4]]$res_Group) {
-      e_vals <- append(e_vals, e_value(A1, A2, groups, g))
+      p_value <- p_value(A1, A2, groups, g)
+      e_vals <- append(e_vals, e_value(p_value))
     }
     
     elp_detex <- elp(e_vals, groups, alpha)[,4]
@@ -255,10 +348,27 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T, compar
     
     # Base level 
     if (!is.null(comparator)) {
+      p_vals_comp <- NULL
       e_vals_comp <- NULL
       for (g in comparator[[4]]$res_Group) {
-        e_vals_comp <- append(e_vals_comp, e_value(A1, A2, comparator, g))
+        p_value <- p_value(A1, A2, comparator, g)
+        p_vals_comp <- append(p_vals_comp, p_value)
+        e_vals_comp <- append(e_vals_comp, e_value(p_value))
       }
+      
+      # BH on base level groups
+      
+      p_vals_comp_adj <- p.adjust(p_vals_comp, "BH")
+      
+      p_bh_detex_comp <- comparator[[4]]$res_Group[p_vals_comp_adj <= alpha]
+      
+      if (valid) {
+        p_bh_detex_comp <- intersect(p_bh_detex_comp, groups[[2]][[perturb_g]])
+      }
+      
+      detections_p_bh_comp[[as.character(size)]] <- p_bh_detex_comp
+      
+      # Base level groups only eLP
       
       elp_detex_comp <- elp(e_vals_comp, comparator, alpha)[,4]
       
@@ -271,12 +381,13 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, valid = T, compar
   }
   
   if (!is.null(comparator)) {
-    return(list(detections, detections_comp))
+    return(list(detections, detections_comp, detections_p_bh_comp))
   }
   
   return(detections)
 }
 
+# DUH doesn't work bc you changed the detection format
 # Simulation by groups: iterate over all groups and run main simulation. Problem: Extremely slow.
 # INPUT: 
 # groups: list of group attributes.
@@ -311,23 +422,48 @@ groupwise_sim <- function(groups, alpha, theta, sizes) {
 # THETA: unperturbed parameter adjacency matrix.
 # sizes: vector of sizes (including sign for direction) of perturbations.
 # OUTPUT: 
-# sim_frame: data frame of average rejection resolutions by size and group, with sizes being rows.
-groupwise_sim_comp <- function(groups, alpha, theta, sizes) {
-  sim_frame <- data.frame("Size" = sizes)
+# sim_frame: list of data frames. 
+# sim_frame[[1]]: data frame of average rejection resolutions by size and group, with sizes being rows.
+# sim_frame[[2]]: data frame of whether any rejection was made using all groups.
+# sim_frame[[3]]: data frame of whether any rejection was made using base groups only.
+groupwise_sim_comp <- function(groups, alpha, theta, sizes, groups_comp) {
+  sim_frames <- NULL
+  for (i in 1:3) {
+    sim_frames[[i]] <- data.frame("Size" = sizes)
+  }
+  
   resolutions <- NULL
+  detex <- NULL
+  detex_comp <- NULL
+  # Take rejection resolutions
   for (rg in groups[[4]][,4]) {
     # Use selector = 2 for resolutions
-    detections <- simulation(groups, alpha, theta, rg, sizes, 2)
+    detex_list <- simulation(groups, alpha, theta, rg, sizes, 2, comparator = groups_comp)
+    detections <- detex_list[[1]]
+    detections_comp <- detex_list[[2]]
+    print(detections)
+    
     for (i in 1:length(sizes)) {
       if (length(detections[[i]]) == 0) {
-        resolutions[i] <- -1
+        # coded 4 so that when resolution is inverted for graph it becomes 0.
+        resolutions[i] <- 4
+        detex[i] <- 0
       } else {
-        resolutions[i] <- mean(detections[[i]])
+        res_nums <- groups[[4]][groups[[4]][,4] %in% detections[[i]],2]
+        resolutions[i] <- mean(res_nums)
+        detex[i] <- 1
+      }
+      if (length(detections_comp[[i]]) == 0) {
+        detex_comp[i] <- 0
+      } else {
+        detex_comp[i] <- 1
       }
     }
-    sim_frame[,rg] <- resolutions
+    sim_frames[[1]][,rg] <- resolutions
+    sim_frames[[2]][,rg] <- detex
+    sim_frames[[3]][,rg] <- detex_comp
   }
-  return(sim_frame)
+  return(sim_frames)
 }
 
 # Simulation plot: Given a data frame of average rejection resolution by size and groups, plot full average rejection resolutions as a spline curve on size across 
@@ -351,16 +487,26 @@ sim_plot <- function(sim_frame) {
 # Try sizes approx. sigma. Curiously, seems to prefer rejecting when neighbours also have rejections.
 
 # Multicore wrapper. 
-mc_sim_study <- function(seed, groups, alpha, theta, sizes) {
+mc_sim_study <- function(seed, groups, alpha, theta, sizes, groups_comp) {
   set.seed(seed)
-  detections <- groupwise_sim(groups, alpha, theta, sizes)
+  sim_frame <- groupwise_sim_comp(groups, alpha, theta, sizes, groups_comp)
 }
 
 GROUPS <- generate_groups(GROUP.SIZES, N.SIZE)
 GROUPS_COMP <- generate_groups(1, N.SIZE)
-simulation(GROUPS, 0.05, THETA, "res_3_group_1", 5, T, GROUPS_COMP)
 
 SIZES <- seq(0.5, 10, 0.5)
 SEEDS <- 1:1000
 
-# detex <- mclapply(SEEDS, mc_sim_study, groups = GROUPS, alpha = 0.05, theta = THETA, sizes = SIZES)
+sim_frames <- mclapply(SEEDS, mc_sim_study, groups = GROUPS, alpha = 0.05, theta = THETA, sizes = SIZES, groups_comp = GROUPS_COMP)
+resolutions <- sim_frames[[1]][[1]]
+detex <- sim_frames[[1]][[2]]
+detex_comp <- sim_frames[[1]][[3]]
+for (i in 2:length(sim_frames)) {
+  resolutions <- resolutions + sim_frames[[i]][[1]]
+  detex <- detex + sim_frames[[i]][[2]]
+  detex_comp <- detex_comp + sim_frames[[i]][[3]]
+}
+res_mean <- resolutions / length(sim_frames)
+detex_mean <- detex / length(sim_frames)
+detex_comp_mean <- detex_comp / length(sim_frames)
