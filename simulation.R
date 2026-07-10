@@ -234,6 +234,23 @@ e_value <- function(p_value) {
   return(e_value)
 }
 
+e_value_dir <- function(A1, A2, groups, g, d) {
+  # Get vector of edges in the group
+  res_grp <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
+  edges <- which(groups[[1]][,res_grp$Resolution] == res_grp$Group_Number)
+  # Yield node pairs of the edges in question
+  m <- length(edges)
+  
+  # Because groups are homogeneous across adjacency matrices, we can simply pool both sample sizes (I think?).
+  n <- m * dim(A1)[3]
+  A1_bar <- mean(apply(A1, c(1,2), mean)[edges])
+  A2_bar <- mean(apply(A2, c(1,2), mean)[edges]) # For some reason the old formulation didn't work. Probably some silly indexing.
+  
+  z.stat <- (A1_bar - A2_bar) / (SIGMA * sqrt(2/n))
+  
+  return(exp(d * z.stat - d^2/2) + exp(-d * z.stat - d^2/2))
+}
+
 # TODO: Be able to perturb in a more targeted manner.
 # Apply a perturbation to the parameter adjacency matrix.
 # INPUT:
@@ -339,7 +356,7 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, comparator = NULL
     # rep(NA, dim(groups[[4]])[1])
     for (g in groups[[4]]$res_Group) {
       p_value <- p_value(A1, A2, groups, g)
-      e_vals <- append(e_vals, e_value(p_value)) # use index instead
+      e_vals <- append(e_vals, e_value_dir(A1, A2, groups, g, 5)) # use index instead
     }
     
     elp_detex <- elp(e_vals, groups, alpha)[,4]
@@ -358,7 +375,7 @@ simulation <- function(groups, alpha, theta, perturb_g, sizes, comparator = NULL
       for (g in comparator[[4]]$res_Group) {
         p_value <- p_value(A1, A2, comparator, g)
         p_vals_comp <- append(p_vals_comp, p_value)
-        e_vals_comp <- append(e_vals_comp, e_value(p_value))
+        e_vals_comp <- append(e_vals_comp, e_value_dir(A1, A2, groups, g, 5))
       }
       
       # BH on base level groups
