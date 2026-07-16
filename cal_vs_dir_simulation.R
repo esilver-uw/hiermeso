@@ -228,16 +228,23 @@ e_value_dir <- function(A1, A2, groups, g, d) {
   res_grp <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
   edges <- which(groups[[1]][,res_grp$Resolution] == res_grp$Group_Number)
   # Yield node pairs of the edges in question
-  m <- length(edges)
+  n <- length(edges)
   
   # Because groups are homogeneous across adjacency matrices, we can simply pool both sample sizes (I think?).
-  n <- m * dim(A1)[3]
+  m <- n * dim(A1)[3]
   A1_bar <- mean(apply(A1, c(1,2), mean)[edges])
   A2_bar <- mean(apply(A2, c(1,2), mean)[edges]) # For some reason the old formulation didn't work. Probably some silly indexing.
   
-  z.stat <- (A1_bar - A2_bar) / (SIGMA / sqrt(n))
+  z.stat <- (A1_bar - A2_bar) * sqrt(m) / SIGMA
   
-  return(exp(d * z.stat - d^2/2) + exp(-d * z.stat - d^2/2))
+  e_value <- exp(d * z.stat - d^2/2) + exp(-d * z.stat - d^2/2)
+  
+  # Threshold cutoff
+  if (e_value >= 1e+15) {
+    e_value = 1e+15
+  }
+  
+  return(e_value)
 }
 
 # TODO: Be able to perturb in a more targeted manner.
@@ -323,7 +330,7 @@ get_delta <- function(size, groups, treatment_g) {
   res <- groups[[4]][groups[[4]]$res_Group == treatment_g,2]
   group.size <- sum(groups[[1]][res] == group_num)
   
-  delta <- (sqrt(group.size * N.SIZE) * size) / SIGMA
+  delta <- 0.9 * (sqrt(group.size * N.SIZE) * size) / SIGMA
   return(delta)
 }
 
@@ -350,7 +357,7 @@ first_sim <- function(groups, theta, treatment_g, size, iterations) {
   return(c(mean(dir_vals), mean(cal_vals), mean(p_vals)))
 }
 
-first_sim(GROUPS, THETA, "res_2_group_2", 50, 5)
+first_sim(GROUPS, THETA, "res_2_group_2", 1, 20)
 
 # Second simulation goal: for each group, take direct e-values from multiple deltas near the oracle. 
 second_sim <- function(groups, theta, treatment_g, size) {
@@ -369,4 +376,5 @@ second_sim <- function(groups, theta, treatment_g, size) {
   return(e_vals)
 }
 
-second_sim(GROUPS, THETA, "res_2_group_2", 3)
+# Overestimating size
+second_sim(GROUPS, THETA, "res_2_group_2", 5)

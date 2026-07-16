@@ -24,19 +24,15 @@ proc_elp <- function(A1, A2, groups, groups_subset, size = F) {
   } else {
     for (i in 1:n.groups) {
       p_val <- p_value(A1, A2, groups, groups_subset[i])
-      e_vals[i] <- e_Value_cal(p_val)
+      e_vals[i] <- e_value_cal(p_val)
     }
   }
   
-  selections <- elp(e_vals, groups_subset, 0.05)
-  result <- data.frame("Selections" = selections == 1, "e-values" = e_vals)
+  # TODO: fix for subsets
+  selections <- elp(e_vals, groups, 0.05)
+  result <- data.frame("Selections" = selections, "e-values" = e_vals)
   
   return(result)
-}
-
-# Wrapper for groups = groups_subset. Inherits definition from above, sans groups_subset.
-proc_omnibus_elp <- function(A1, A2, groups, size = F) {
-  return(proc_elp(A1, A2, groups, groups[[4]]$res_Group, size))
 }
 
 # Performs eLP procedure starting with the largest resolution.
@@ -57,12 +53,12 @@ proc_seq_elp <- function(A1, A2, groups, size = F) {
   }
 }
 
-theta_prime <- perturb_parameter_matrix(theta = THETA, groups = GROUPS, g = "res_3_group_2", size = 8)
+theta_prime <- perturb_parameter_matrix(theta = THETA, groups = GROUPS, g = "res_3_group_2", size = 2)
 
 A1 <- sample_network(theta = THETA, N)
 A2 <- sample_network(theta = theta_prime, N)
 
-E_VALS <- proc_elp(A1, A2, GROUPS, GROUPS[[4]]$res_Group, 10)
+E_VALS <- proc_elp(A1, A2, GROUPS, GROUPS[[4]]$res_Group, 2)
 
 selections <- elp(E_VALS, GROUPS, 0.05)
 GROUPS[[4]][which(selections == 1),]
