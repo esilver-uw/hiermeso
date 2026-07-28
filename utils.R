@@ -1,19 +1,5 @@
 # Library for functions
 
-# Imports
-# library(network)
-# library(igraph)
-library(abind)
-library(CVXR)
-library(Rglpk)
-library(parallel)
-
-# Devise globals, including parameter adjacency matrix
-SIGMA <- 50
-N.SIZE <- 64
-N <- 20
-GROUP.SIZES <- c(8,16,32)
-
 # Helper from Stack Overflow:
 # Source - https://stackoverflow.com/a/8189441
 # Posted by Ken Williams, modified by community. See post 'Timeline' for change history
@@ -22,17 +8,6 @@ Mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
 }
-
-
-# Create parameter adjacency matrix
-set.seed(1970)
-THETA <- matrix(0, nrow = N.SIZE, ncol = N.SIZE)
-for (i in 1:N.SIZE) {
-  for (j in i:N.SIZE) {
-    THETA[i,j] <- runif(1, -15, 15)
-  }
-}
-THETA[lower.tri(THETA)] = t(THETA)[lower.tri(THETA)]
 
 # Create groups, inspired by KeLP architecture.
 # INPUT:
@@ -184,7 +159,7 @@ sample_network <- function(theta, n) {
 # size: size and direction of perturbation to apply.
 # OUTPUT:
 # theta_prime: perturbed parameter adjacency matrix.
-perturb_parameter_matrix <- function(theta, groups, g, size) {
+perturb_expected_matrix <- function(theta, groups, g, size) {
   # Get vector of edges in the group
   res_Group <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
   edges <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
@@ -246,7 +221,7 @@ elp <- function(e_vals, groups, alpha) {
   return(selections)
 }
 
-# Helper function to get oracle delta
+# SHOULDN'T BE USED. Helper function to get oracle delta
 # INPUT: 
 # size: expected size of the perturbation
 # groups: list of group attributes
@@ -258,4 +233,15 @@ get_delta <- function(size, groups, treatment_g) {
   
   delta <- (sqrt(group.size * N.SIZE) * size) / SIGMA
   return(delta)
+}
+
+# Truncation function per Wang & Ramdas 2022
+# INPUT: 
+# K: K for the truncation function (number of hypotheses)
+# x: x for the truncation.
+trunc <- function(K, x) {
+  if (x >= 1) {
+    return(K/ceiling(K/x))
+  }
+  return(0)
 }

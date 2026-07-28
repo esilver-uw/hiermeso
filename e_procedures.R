@@ -1,7 +1,5 @@
 # Procedures for simulations
 
-source("utils.R")
-
 # Given a group and the two populations, return a p-value.
 # INPUT:
 # A.1: array of Adjacency Matrices from the first population.
@@ -100,7 +98,7 @@ lr_delta <- function(A1, A2, groups, g, pt) {
   
   z_stat <- (A1_bar - A2_bar) * sqrt(m) / SIGMA
   
-  e_value <- exp(d * z_stat - d^2/2) + exp(-d * z_stat - d^2/2)
+  e_value <- (exp(d * z_stat - d^2/2) + exp(-d * z_stat - d^2/2))/2
   
   # Threshold cutoff
   if (e_value >= 1e+15) {
@@ -134,7 +132,7 @@ lr_prior <- function(A1, A2, groups, g, ps) {
   
   x_bar <- (A1_bar - A2_bar)
   norm_term <- 1/(ps*sqrt(n/SIGMA^2 + 1/ps^2))
-  expo_term <- (m^2*x_bar)/(2*SIGMA^4*sqrt(n/SIGMA^2 + 1/ps^2))
+  expo_term <- (m^2*x_bar^2)/(2*SIGMA^4*sqrt(n/SIGMA^2 + 1/ps^2))
   
   # combine into e-value.
   e_value <- norm_term * exp(expo_term)
