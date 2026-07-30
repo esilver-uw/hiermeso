@@ -14,7 +14,7 @@ library(parallel)
 SIGMA <- 50
 N.SIZE <- 64
 N <- 5
-GROUP.SIZES <- c(8,16,32)
+GROUP.SIZES <- c(4,8,16)
 SIGNAL.SIZES <- 1:10
 source("utils.R")
 source("e_procedures.R")
@@ -168,7 +168,7 @@ filter_true_selex <- function(selex_array, p_group, semi_true = F) {
   return(filter_array)
 }
 
-# Three extremely basic apply wrappers.
+# THE LENSES: Three extremely basic apply wrappers.
 # INPUT: 
 # selex_array: an array of test group selections by iteration and size.
 # OUTPUT:
@@ -191,3 +191,15 @@ detex_selex <- function(selex_array) {
 }
 
 # need a function to stack methods vertically using rowbind. wrap filter and mean/sum to do that.
+# Fitter function for visualization.
+# INPUT: 
+# selex_arrays: a list of arrays of test group selections by iteration and size, indexed by method.
+# lens: sum_selex, mean_selex, or detex_selex. Default: detex_selex.
+viz_fitter <- function(selex_arrays, lens = detex_selex) {
+  viz_mat <- NULL
+  for (i in names(selex_arrays)) {
+    selex_mat <- detex_selex(selex_arrays[i])
+    selex_mat <- cbind(selex_mat, rep(i, dim(selex_mat)[1]))
+    viz_mat <- rbind(viz_mat, selex_mat)
+  }
+}
