@@ -97,8 +97,8 @@ lr_delta <- function(A1, A2, groups, g, pt) {
   A2_bar <- mean(apply(A2, c(1,2), mean)[edges]) # For some reason the old formulation didn't work. Probably some silly indexing.
   
   x_bar <- (A1_bar - A2_bar)
-  obs_term <- (m * pt * x_bar)/SIGMA^2
-  delta_term <- (m * pt^2)/(2 * SIGMA^2)
+  obs_term <- (m * pt * x_bar)/(2 * SIGMA^2)
+  delta_term <- (m * pt^2)/(4 * SIGMA^2)
   
   e_value <- (exp(obs_term - delta_term) + exp(-obs_term - delta_term))/2
   
@@ -133,8 +133,8 @@ lr_prior <- function(A1, A2, groups, g, ps) {
   A2_bar <- mean(apply(A2, c(1,2), mean)[edges]) # For some reason the old formulation didn't work. Probably some silly indexing.
   
   x_bar <- (A1_bar - A2_bar)
-  norm_term <- 1/(ps*sqrt(m/SIGMA^2 + 1/ps^2))
-  expo_term <- (m^2*x_bar^2)/(2*SIGMA^4*sqrt(m/SIGMA^2 + 1/ps^2))
+  norm_term <- 1/(ps*sqrt(m/(sqrt(2)*SIGMA) + 1/ps^2))
+  expo_term <- (m^2*x_bar^2)/(2*SIGMA^4*sqrt(m/(2*(SIGMA^2)) + 1/ps^2))
   
   # combine into e-value.
   e_value <- norm_term * exp(expo_term)
