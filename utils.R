@@ -221,20 +221,6 @@ elp <- function(e_vals, groups, alpha) {
   return(selections)
 }
 
-# SHOULDN'T BE USED. Helper function to get oracle delta
-# INPUT: 
-# size: expected size of the perturbation
-# groups: list of group attributes
-# treatment_g: group in question
-get_delta <- function(size, groups, treatment_g) {
-  group_num <- groups[[4]][groups[[4]]$res_Group == treatment_g,1]
-  res <- groups[[4]][groups[[4]]$res_Group == treatment_g,2]
-  group.size <- sum(groups[[1]][res] == group_num)
-  
-  delta <- (sqrt(group.size * N.SIZE) * size) / SIGMA
-  return(delta)
-}
-
 # Truncation function per Wang & Ramdas 2022
 # INPUT: 
 # K: K for the truncation function (number of hypotheses)

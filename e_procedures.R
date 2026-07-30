@@ -20,7 +20,7 @@ p_value <- function(A1, A2, groups, g) {
   A1_bar <- mean(apply(A1, c(1,2), mean)[edges])
   A2_bar <- mean(apply(A2, c(1,2), mean)[edges]) # For some reason the old formulation didn't work. Probably some silly indexing.
   
-  z_stat <- (A1_bar - A2_bar) * sqrt(m) / SIGMA
+  z_stat <- (A1_bar - A2_bar) * sqrt(m) / (sqrt(2) * SIGMA)
   p_value <- pnorm(z_stat)
   
   return(p_value)
@@ -96,9 +96,11 @@ lr_delta <- function(A1, A2, groups, g, pt) {
   A1_bar <- mean(apply(A1, c(1,2), mean)[edges])
   A2_bar <- mean(apply(A2, c(1,2), mean)[edges]) # For some reason the old formulation didn't work. Probably some silly indexing.
   
-  z_stat <- (A1_bar - A2_bar) * sqrt(m) / SIGMA
+  x_bar <- (A1_bar - A2_bar)
+  obs_term <- (m * pt * x_bar)/SIGMA^2
+  delta_term <- (m * pt^2)/(2 * SIGMA^2)
   
-  e_value <- (exp(d * z_stat - d^2/2) + exp(-d * z_stat - d^2/2))/2
+  e_value <- (exp(obs_term - delta_term) + exp(-obs_term - delta_term))/2
   
   # Threshold cutoff
   if (e_value >= 1e+15) {
@@ -131,8 +133,8 @@ lr_prior <- function(A1, A2, groups, g, ps) {
   A2_bar <- mean(apply(A2, c(1,2), mean)[edges]) # For some reason the old formulation didn't work. Probably some silly indexing.
   
   x_bar <- (A1_bar - A2_bar)
-  norm_term <- 1/(ps*sqrt(n/SIGMA^2 + 1/ps^2))
-  expo_term <- (m^2*x_bar^2)/(2*SIGMA^4*sqrt(n/SIGMA^2 + 1/ps^2))
+  norm_term <- 1/(ps*sqrt(m/SIGMA^2 + 1/ps^2))
+  expo_term <- (m^2*x_bar^2)/(2*SIGMA^4*sqrt(m/SIGMA^2 + 1/ps^2))
   
   # combine into e-value.
   e_value <- norm_term * exp(expo_term)
