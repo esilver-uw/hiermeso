@@ -9,68 +9,9 @@ Mode <- function(x) {
   ux[which.max(tabulate(match(x, ux)))]
 }
 
-# Create groups, inspired by KeLP architecture.
-# INPUT:
-# GROUP_SIZES: vector of group sizes.
-# n: number of nodes.
-# OUTPUT:
-# for L length of GROUP_SIZES
-# groups: data frame of dimension n^2 x L specifying group membership for each possible edge.
-# node_groups: data frame of dimension n x L specifying node-group membership for each node.
-# nodes_edge: data frame of dimension n^2 x 3 linking node pairs to edges.
-# group_info: data frame containing group, level, and group-level for each group.
-generate_groups <- function(GROUP_SIZES, n) {
-  # number of levels
-  L <- length(GROUP_SIZES)
-  
-  # nodes_edge
-  nodes_edge <- cbind(expand.grid(1:n, 1:n), 1:n^2)
-  
-  # groups will be all combinations of node_groups. 
-  groups <- matrix(0, n^2, L)
-  for (l in 1:L) {
-    index <- 1
-    for (i in 1:(n/GROUP_SIZES[l])) {
-      i_valid <- (i*GROUP_SIZES[l]) + 1 - 1:GROUP_SIZES[l]
-      for (j in i:(n/GROUP_SIZES[l])) {
-        # Group size is tolerance frame. If 
-        j_valid <- (j*GROUP_SIZES[l]) + 1 - 1:GROUP_SIZES[l]
-        groups[(nodes_edge[,1] %in% i_valid & nodes_edge[,2] %in% j_valid) | (nodes_edge[,1] %in% j_valid & nodes_edge[,2] %in% i_valid),l] <- index
-        index <- index + 1
-      }
-    }
-  }
-  
-  group_info <- c()
-  
-  for (l in 1:L) {
-    df_temp <- data.frame("Group_Number" = unique(groups[,l]))
-    df_temp$Resolution <- l
-    df_temp$group <- paste0("group_", df_temp$Group_Number)
-    df_temp$res_Group <- paste0("res_",df_temp$Resolution, "_", df_temp$group)
-    
-    group_info <- rbind(group_info, df_temp)
-  }
-  
-  group_subgroups <- NULL
-  
-  for (g in group_info$res_Group) {
-    subgroups <- NULL
-    group <- group_info$Group_Number[group_info$res_Group == g]
-    res <- group_info$Resolution[group_info$res_Group == g]
-    for (i in 1:res) {
-      subgroups_i <- unique(paste0("group_",groups[groups[,res] == group, i]))
-      subgroups <- append(subgroups, paste0("res_",i,"_",subgroups_i))
-    }
-    group_subgroups[[g]] <- subgroups
-  }
-  
-  return(list(groups, group_subgroups, nodes_edge, group_info))
-}
-
 # Create groups for upper triangle, inspired by KeLP architecture.
 # INPUT:
-# GROUP_SIZES: vector of group sizes.
+# group_sizes: vector of group sizes.
 # n: number of nodes.
 # OUTPUT:
 # for L length of GROUP_SIZES
@@ -78,9 +19,9 @@ generate_groups <- function(GROUP_SIZES, n) {
 # node_groups: data frame of dimension n x L specifying node-group membership for each node.
 # nodes_edge: data frame of dimension n^2 x 3 linking node pairs to edges.
 # group_info: data frame containing group, level, and group-level for each group.
-generate_groups <- function(GROUP_SIZES, n) {
+generate_groups <- function(group_sizes, n) {
   # number of levels
-  L <- length(GROUP_SIZES)
+  L <- length(group_sizes)
   
   # nodes_edge
   nodes_edge <- NULL
@@ -91,24 +32,29 @@ generate_groups <- function(GROUP_SIZES, n) {
   }
   
   # groups will be all combinations of node_groups. 
-  groups <- NULL
-  groups <- cbind(matrix(0, n^2, L), expand.grid(1:n,1:n))
+  upper_mask <- matrix(1:N^2, nrow = N)[upper.tri(matrix(1:N^2, nrow = N), T)]
+  groups <- cbind(matrix(0, N^2, length(resolutions)), expand.grid(1:N,1:N))
+  
   for (l in 1:L) {
-    index <- 1
-    for (i in 1:(n/GROUP_SIZES[l])) {
-      i_valid <- (i*GROUP_SIZES[l]) + 1 - 1:GROUP_SIZES[l]
-      for (j in i:(n/GROUP_SIZES[l])) {
-        # Group size is tolerance frame. If
-        j_valid <- (j*GROUP_SIZES[l]) + 1 - 1:GROUP_SIZES[l]
-        # groups[(nodes_edge[,1] %in% i_valid & nodes_edge[,2] %in% j_valid) | (nodes_edge[,1] %in% j_valid & nodes_edge[,2] %in% i_valid),l] <- index
-        groups[(nodes_edge[,1] %in% i_valid & nodes_edge[,2] %in% j_valid),l] <- index
-        index <- index + 1
+    g <- 0
+    group_size <- group_sizes[l]
+    group_nodes <- split(node_list, ceiling(node_list/group_size))
+    for (i in 1:ceiling(n/group_size)) {
+      for (j in 1:ceiling(n/group_size)) {
+        pairs <- as.matrix(expand.grid(group_nodes[[i]], group_nodes[[j]]))
+        group <- intersect(matrix(1:N^2, nrow = n)[pairs], upper_mask)
+        if (length(group)) {
+          g <- g + 1
+          for (k in group) {
+            groups[k,l] <- g
+          }
+        }
       }
     }
   }
   
-  # me caveman. me de-duplicate up to ordering.
-  groups <- groups[groups[,L+1] %in% nodes_edge[,1] & groups[,L+2] %in% nodes_edge[,2],1:3]
+  # Remove empty rows
+  groups <- groups[which(groups[,1] != 0),]
   
   group_info <- c()
   
@@ -135,19 +81,6 @@ generate_groups <- function(GROUP_SIZES, n) {
   }
   
   return(list(groups, group_subgroups, nodes_edge, group_info))
-}
-
-# Returns an observation from a given parameter adjacency matrix.
-sample_network <- function(theta, n) {
-  A <- array(NA, c(nrow(theta), ncol(theta), n))
-  for (k in 1:n) {
-    for (i in 1:nrow(theta)) {
-      for (j in 1:ncol(theta)) {
-        A[i,j,k] = rnorm(1, theta[i,j], SIGMA)
-      }
-    }
-  }
-  return(A)
 }
 
 # TODO: Be able to perturb in a more targeted manner.
