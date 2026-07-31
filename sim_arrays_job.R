@@ -3,7 +3,7 @@ args <- commandArgs(trailingOnly = TRUE)
 ct <- args[1]
 job_num <- args[2]
 
-source("sim_data.R")
+source("sim_utils.R")
 
 sim_arrays <- batchable_array(ct)
 
