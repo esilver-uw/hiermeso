@@ -11,11 +11,11 @@ library(Rglpk)
 library(parallel)
 
 # Devise globals, including expected adjacency matrix
-SIGMA <- 50
+SIGMA <- 25
 N.SIZE <- 64
 N <- 5
 GROUP.SIZES <- c(4,8,16)
-SIGNAL.SIZES <- 1:10
+SIGNAL.SIZES <- 10
 source("utils.R")
 source("e_procedures.R")
 
@@ -38,6 +38,10 @@ THETA[lower.tri(THETA)] = t(THETA)[lower.tri(THETA)]
 array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
   sim_array <- array(dim = c(length(p_groups), dim(GROUPS[[4]])[1], length(SIGNAL.SIZES), 11))
   A1 <- sample_network(THETA, N)
+  # This can happen once.
+  m <- N.SIZE * dim(A1)[3]
+  # A1 Sample-wise Mean
+  A1_sm <- apply(A1, c(1,2), mean)
   
   i = 0
   for (size in SIGNAL.SIZES) {
@@ -49,11 +53,22 @@ array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
       
       theta_prime <- perturb_expected_matrix(THETA, GROUPS, p_group, size)
       A2 <- sample_network(theta_prime, N)
+      # A2 Sample-wise Mean
+      A2_sm <- apply(A2, c(1,2), mean)
       
       for (t_group in GROUPS[[4]]$res_Group) {
+        # This can happen once per group
         k <- k + 1
         
-        p_val <- p_value(A1, A2, GROUPS, t_group)
+        # Get vector of edges in the group then yield node pairs.
+        res_grp <- data.frame(GROUPS[[4]][GROUPS[[4]]$res_Group == t_group,1:2])
+        edges <- which(GROUPS[[1]][,res_grp$Resolution] == res_grp$Group_Number)
+        
+        A2_bar <- mean(A1_sm[edges])
+        A1_bar <- mean(A2_sm[edges])
+        d_bar <- A1_bar - A2_bar
+        
+        p_val <- p_value(d_bar, m)
         
         kappas <- c(0.25, 0.5, 0.75)
         cal_kappa_1 <- cal_kappa(p_val, kappas[1])
@@ -63,14 +78,14 @@ array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
         cal_mix <- cal_mixture(p_val)
         
         pts <- c(2.5, 5, 7.5)
-        lr_delta_1 <- lr_delta(A1, A2, GROUPS, t_group, pts[1])
-        lr_delta_2 <- lr_delta(A1, A2, GROUPS, t_group, pts[2])
-        lr_delta_3 <- lr_delta(A1, A2, GROUPS, t_group, pts[3])
+        lr_delta_1 <- lr_delta(d_bar, m, pts[1])
+        lr_delta_2 <- lr_delta(d_bar, m, pts[2])
+        lr_delta_3 <- lr_delta(d_bar, m, pts[3])
         
         priors <- c(10, 25, 50)
-        lr_prior_1 <- lr_prior(A1, A2, GROUPS, t_group, priors[1])
-        lr_prior_2 <- lr_prior(A1, A2, GROUPS, t_group, priors[2])
-        lr_prior_3 <- lr_prior(A1, A2, GROUPS, t_group, priors[3])
+        lr_prior_1 <- lr_prior(d_bar, m, priors[1])
+        lr_prior_2 <- lr_prior(d_bar, m, priors[2])
+        lr_prior_3 <- lr_prior(d_bar, m, priors[3])
         
         sim_array[j,k,i,] <- c(p_val, cal_kappa_1, cal_kappa_2, cal_kappa_3, cal_mix, lr_delta_1, lr_delta_2, lr_delta_3, lr_prior_1, lr_prior_2, lr_prior_3)
       }

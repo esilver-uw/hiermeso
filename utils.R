@@ -32,17 +32,16 @@ generate_groups <- function(group_sizes, n) {
   }
   
   # groups will be all combinations of node_groups. 
-  upper_mask <- matrix(1:N^2, nrow = N)[upper.tri(matrix(1:N^2, nrow = N), T)]
-  groups <- cbind(matrix(0, N^2, length(resolutions)), expand.grid(1:N,1:N))
-  
+  upper_mask <- matrix(1:n^2, nrow = n)[upper.tri(matrix(1:n^2, nrow = n), T)]
+  groups <- cbind(matrix(0, n^2, length(group_sizes)), expand.grid(1:n,1:n))
   for (l in 1:L) {
     g <- 0
     group_size <- group_sizes[l]
-    group_nodes <- split(node_list, ceiling(node_list/group_size))
+    group_nodes <- split(1:n, ceiling(1:n/group_size))
     for (i in 1:ceiling(n/group_size)) {
       for (j in 1:ceiling(n/group_size)) {
         pairs <- as.matrix(expand.grid(group_nodes[[i]], group_nodes[[j]]))
-        group <- intersect(matrix(1:N^2, nrow = n)[pairs], upper_mask)
+        group <- intersect(matrix(1:n^2, nrow = n)[pairs], upper_mask)
         if (length(group)) {
           g <- g + 1
           for (k in group) {
@@ -83,6 +82,24 @@ generate_groups <- function(group_sizes, n) {
   return(list(groups, group_subgroups, nodes_edge, group_info))
 }
 
+# Returns observations from a given expected adjacency matrix.
+# INPUT:
+# theta: expected (mean) adjacency matrix
+# n: sample size
+# OUTPUT: 
+# A: array of n observed adjacency matrices
+sample_network <- function(theta, n) {
+  A <- array(NA, c(nrow(theta), ncol(theta), n))
+  for (k in 1:n) {
+    for (i in 1:nrow(theta)) {
+      for (j in 1:ncol(theta)) {
+        A[i,j,k] = rnorm(1, theta[i,j], SIGMA)
+      }
+    }
+  }
+  return(A)
+}
+
 # TODO: Be able to perturb in a more targeted manner.
 # Apply a perturbation to the parameter adjacency matrix.
 # INPUT:
@@ -94,8 +111,8 @@ generate_groups <- function(group_sizes, n) {
 # theta_prime: perturbed parameter adjacency matrix.
 perturb_expected_matrix <- function(theta, groups, g, size) {
   # Get vector of edges in the group
-  res_Group <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
-  edges <- which(groups[[1]][,res_Group$Resolution] == res_Group$Group_Number)
+  res_grp <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
+  edges <- which(groups[[1]][,res_grp$Resolution] == res_grp$Group_Number)
   
   # Apply perturbation
   theta_prime <- theta
