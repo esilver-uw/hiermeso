@@ -13,7 +13,7 @@ library(parallel)
 # Devise globals, including expected adjacency matrix
 SIGMA <- 25
 N.SIZE <- 64
-N <- 5
+N <- 20
 GROUP.SIZES <- c(4,8,16)
 SIGNAL.SIZES <- 10
 source("utils.R")
