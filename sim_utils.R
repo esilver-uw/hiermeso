@@ -37,6 +37,8 @@ THETA[lower.tri(THETA)] = t(THETA)[lower.tri(THETA)]
 # sim_array: a single iteration simulation array.
 array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
   sim_array <- array(dim = c(length(p_groups), dim(GROUPS[[4]])[1], length(SIGNAL.SIZES), 11))
+  dimnames(sim_array) <- list(p_groups, GROUPS[[4]]$res_Group, SIGNAL.SIZES, 
+                              c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3"))
   A1 <- sample_network(THETA, N)
   # This can happen once.
   m <- N.SIZE * dim(A1)[3]
@@ -51,6 +53,8 @@ array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
       j <- j + 1
       k = 0
       
+      print(p_group)
+      
       theta_prime <- perturb_expected_matrix(THETA, GROUPS, p_group, size)
       A2 <- sample_network(theta_prime, N)
       # A2 Sample-wise Mean
@@ -63,6 +67,9 @@ array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
         # Get vector of edges in the group then yield node pairs.
         res_grp <- data.frame(GROUPS[[4]][GROUPS[[4]]$res_Group == t_group,1:2])
         edges <- which(GROUPS[[1]][,res_grp$Resolution] == res_grp$Group_Number)
+        if (t_group == p_group) {
+          print(edges)
+        }
         
         A2_bar <- mean(A1_sm[edges])
         A1_bar <- mean(A2_sm[edges])
@@ -107,6 +114,7 @@ batchable_array <- function(ct, p_groups = GROUPS[[4]]$res_Group) {
     sims_array[i,,,,] <- array_step(p_groups) 
   }
   
+  dimnames(sims_array) <- c(1:ct, dimnames(sims_array[1,,,,]))
   return(sims_array)
 }
 
@@ -180,30 +188,55 @@ filter_true_selex <- function(selex_array, p_group, semi_true = F) {
   true_idxs <- which(GROUPS[[4]]$res_Group %in% accept)
   
   selex_array[,,-true_idxs] <- 0
-  return(filter_array)
+  return(selex_array)
+}
+
+# Performs e-value testing on multiple iterations on a simulation array across perturbation groups on all methods.
+# INPUT: 
+# mode: 1 for no filtering, 2 for true filtering, 3 for semi-true filtering. Default: 1.
+# OUTPUT: 
+# selex_arrays: 4D array of test group selections by method, iteration, and size.
+omnibus_test <- function(sims_array, p_group, alpha, mode = 1) {
+  selex_arrays <- array(dim = c(10, dim(sims_array)[1], dim(sims_array)[2], dim(sims_array)[3]))
+  dimnames(selex_arrays) <- list(dimnames(sims_array)[[5]][2:11], dimnames(sims_array)[[1]], dimnames(sims_array)[[2]], dimnames(sims_array)[[3]])
+  for (i in length(dimnames(sims_array)[5])) {
+    selex_array <- test_step(sims_array, p_group, i + 1, alpha)
+    
+    if (mode == 2) {
+      selex_array <- filter_true_selex(selex_array, p_group, F)
+    } else if (mode == 3) {
+      selex_array <- filter_true_selex(selex_array, p_group, T)
+    }
+    
+    selex_arrays[i,,,] <- selex_array
+  }
+  return(selex_arrays)
 }
 
 # THE LENSES: Three extremely basic apply wrappers.
 # INPUT: 
 # selex_array: an array of test group selections by iteration and size.
 # OUTPUT:
-# sum or mean or detection matrix, group rows, signal size columns.
-sum_selex <- function(selex_array) {
-  sum_array <- t(apply(selex_array, c(2,3), sum))
-  return(sum_array)
+# detex_array: whether or not any detection is made at a given method/iteration/size.
+detex_selex <- function(selex_array) {
+  # Start by collapsing the test group dimension into 1 on whether or not a detection is made.
+  detex_array <- apply(selex_array, c(1:3), sum)
+  detex_array[detex_array >= 1] <- 1
+  
+  return(detex_array)
 }
 
-# Ditto above.
+# mean_array: mean detection resolution. NOTE: uses inverted resolutions.
 mean_selex <- function(selex_array) {
-  mean_array <- t(apply(selex_array, c(2,3), mean))
+  # Weight detections by resolution.
+  selex_array_wgt <- selex_array * (4 - GROUPS[[4]]$Resolution)
+  detex_array_wgt <- apply(selex_array_wgt, c(1:3), sum)
+  detex_array <- apply(selex_array, c(1:3), sum)
+  mean_array <- detex_array_wgt/detex_array
+  
   return(mean_array)
 }
 
-detex_selex <- function(selex_array) {
-  sum_array <- sum_array(selex_array)
-  detex_array <- sum_array[sum_array >= 1] <- 1
-  return(detex_array)
-}
 
 # need a function to stack methods vertically using rowbind. wrap filter and mean/sum to do that.
 # Fitter function for visualization.
@@ -212,9 +245,11 @@ detex_selex <- function(selex_array) {
 # lens: sum_selex, mean_selex, or detex_selex. Default: detex_selex.
 viz_fitter <- function(selex_arrays, lens = detex_selex) {
   viz_mat <- NULL
-  for (i in names(selex_arrays)) {
-    selex_mat <- detex_selex(selex_arrays[i])
-    selex_mat <- cbind(selex_mat, rep(i, dim(selex_mat)[1]))
+  for (i in 1:dim(selex_arrays)[1]) {
+    selex_mat <- detex_selex(selex_arrays[i,,,])
+    print(selex_mat)
+    selex_mat <- cbind(selex_mat, rep(dimnames(selex_arrays)[[1]][i], dim(selex_mat)[1]))
     viz_mat <- rbind(viz_mat, selex_mat)
   }
+  return(viz_mat)
 }
