@@ -89,11 +89,16 @@ lr_delta <- function(d_bar, m, pt) {
 # OUTPUT: 
 # e_value: an e_value.
 lr_prior <- function(d_bar, m, ps) {
-  norm_term <- 1/(ps*sqrt(m/(sqrt(2)*SIGMA) + 1/ps^2))
-  expo_term <- (m^2*d_bar^2)/(2*SIGMA^4*sqrt(m/(2*(SIGMA^2)) + 1/ps^2))
+  # Simply much more tractable in tau notation.
+  t <- SIGMA^(-2)
+  t_0 <- ps^(-2)
+  
+  norm_term <- sqrt(t_0)/sqrt(m/2 * t + t_0)
+  exp_term_num <- m^2/4*t^2*d_bar^2
+  exp_term_denom <- 2*(m/2*t + t_0)
   
   # combine into e-value.
-  e_value <- norm_term * exp(expo_term)
+  e_value <- norm_term * exp(exp_term_num/exp_term_denom)
   
   # Threshold cutoff
   if (e_value >= 1e+15) {

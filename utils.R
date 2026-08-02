@@ -165,7 +165,7 @@ elp <- function(e_vals, groups, alpha) {
   
   problem <- CVXR::Problem(objective = objective, constraints = constraints)
   
-  result <- psolve(problem, solver = 'GLPK_MI')
+  result <- psolve(problem)
   selections <- value(x)
   
   return(selections)
