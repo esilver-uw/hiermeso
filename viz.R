@@ -13,7 +13,8 @@ selex_arrays_3 <- omnibus_test(sim_arrays_1, 3, 0.05, 3)
 viz_matrix <- viz_fitter(selex_arrays_1)
 
 # Plot n procedures
-detex_plot <- function(viz_mat) {
+detex_plot <- function(viz_mat, methods) {
+  viz_mat <- viz_mat[viz_mat$method %in% methods]
   ggplot() +
     geom_path(mapping = aes(x = as.integer(viz_mat$size), y = viz_mat$detex, colour = viz_mat$method, group = viz_mat$method)) +
     xlab(label = "Signal Size") + ylab(label = "Proportion of Rejections") +
@@ -21,7 +22,7 @@ detex_plot <- function(viz_mat) {
 }
 
 # Plot n resolutions
-res_plot <- function(sizes, means) {
+res_plot <- function(viz_mats, method) {
   ggplot() + 
     geom_path(mapping = aes(x = rep(sizes, 3), y = means[,1], colour = as.factor(means$res1))) +
     xlab(label = "Signal Size") +

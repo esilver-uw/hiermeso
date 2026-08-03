@@ -110,8 +110,8 @@ batchable_array <- function(ct, p_groups = GROUPS[[4]]$res_Group) {
     sims_array[i,,,,] <- array_step(p_groups) 
   }
   
-  dimnames(sims_array) <- dimnames(sim_arrays) <- list(1:200, c("res_1_group_2", "res_2_group_2", "res_3_group_3"), GROUPS[[4]]$res_Group, SIGNAL.SIZES,
-                                                       c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3"))
+  dimnames(sims_array) <- list(1:200, c("res_1_group_2", "res_2_group_2", "res_3_group_3"), GROUPS[[4]]$res_Group, SIGNAL.SIZES,
+                               c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3"))
   return(sims_array)
 }
 
@@ -210,7 +210,7 @@ filter_true_selex <- function(selex_array, p_group, semi_true = F) {
   return(selex_array)
 }
 
-# Performs e-value testing on multiple iterations on a simulation array across perturbation groups on all methods.
+# Performs e-value testing on multiple iterations on a simulation array on a single perturbation group on all methods.
 # INPUT: 
 # sims_array: a multiple-iteration simulation array.
 # p_group: a single perturbation group to consider.
@@ -239,8 +239,6 @@ omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS
   
   selex_arrays[1,,,] <- selex_array
   
-  print("p_value done")
-  
   for (i in 2:(dim(sims_array)[5])) {
     selex_array <- test_step(sims_array, p_group_num, i, alpha, t_groups)
     
@@ -251,8 +249,33 @@ omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS
     }
     
     selex_arrays[i,,,] <- selex_array
+  }
+  return(selex_arrays)
+}
+
+# Performs e-value testing on multiple iterations on a simulation array across perturbation groups on a single method.
+# INPUT: 
+# sims_array: a multiple-iteration simulation array.
+# method_idx
+# alpha: alpha level.
+# mode: 1 for no filtering, 2 for true filtering, 3 for semi-true filtering. Default: 1.
+# t_groups: groups to consider.
+# OUTPUT: 
+# selex_arrays: 4D array of test group selections by group, iteration, and size.
+omnires_test <- function(sims_array, method_idx, alpha, mode = 1, t_groups = GROUPS) {
+  selex_arrays <- array(dim = c(11, dim(sims_array)[1], dim(sims_array)[4], dim(sims_array)[3]))
+  dimnames(selex_arrays) <- list(dimnames(sims_array)[[5]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], dimnames(sims_array)[[3]])
+  
+  for (i in 1:(dim(sims_array)[2])) {
+    selex_array <- test_step(sims_array, i, method_idx, alpha, t_groups)
     
-    print("iteration done")
+    if (mode == 2) {
+      selex_array <- filter_true_selex(selex_array, p_group, F)
+    } else if (mode == 3) {
+      selex_array <- filter_true_selex(selex_array, p_group, T)
+    }
+    
+    selex_arrays[i,,,] <- selex_array
   }
   return(selex_arrays)
 }
