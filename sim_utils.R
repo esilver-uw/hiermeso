@@ -329,5 +329,7 @@ viz_fitter <- function(selex_arrays, lens = detex_selex) {
   }
   colnames(viz_mat) <- c("detex", "size", "method")
   rownames(viz_mat) <- 1:dim(viz_mat)[1]
+  viz_mat$detex <- as.numeric(viz_mat$detex)
+  viz_mat$size <- as.numeric(viz_mat$size)
   return(viz_mat)
 }
