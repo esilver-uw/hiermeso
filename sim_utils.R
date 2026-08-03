@@ -37,7 +37,7 @@ THETA[lower.tri(THETA)] = t(THETA)[lower.tri(THETA)]
 # sim_array: a single iteration simulation array.
 array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
   sim_array <- array(dim = c(length(p_groups), dim(GROUPS[[4]])[1], length(SIGNAL.SIZES), 11))
-  dimnames(sim_array) <- list(c("res_1_group_2", "res_2_group_2", "res_3_group_3"), GROUPS[[4]]$res_Group, SIGNAL.SIZES,
+  dimnames(sim_array) <- list(p_groups, GROUPS[[4]]$res_Group, SIGNAL.SIZES,
                               c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3")) 
   A1 <- sample_network(THETA, N)
   # A1 Sample-wise Mean
@@ -110,7 +110,7 @@ batchable_array <- function(ct, p_groups = GROUPS[[4]]$res_Group) {
     sims_array[i,,,,] <- array_step(p_groups) 
   }
   
-  dimnames(sims_array) <- list(1:200, c("res_1_group_2", "res_2_group_2", "res_3_group_3"), GROUPS[[4]]$res_Group, SIGNAL.SIZES,
+  dimnames(sims_array) <- list(1:ct, p_groups, GROUPS[[4]]$res_Group, SIGNAL.SIZES,
                                c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3"))
   return(sims_array)
 }
@@ -263,11 +263,13 @@ omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS
 # OUTPUT: 
 # selex_arrays: 4D array of test group selections by group, iteration, and size.
 omnires_test <- function(sims_array, method_idx, alpha, mode = 1, t_groups = GROUPS) {
-  selex_arrays <- array(dim = c(11, dim(sims_array)[1], dim(sims_array)[4], dim(sims_array)[3]))
-  dimnames(selex_arrays) <- list(dimnames(sims_array)[[5]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], dimnames(sims_array)[[3]])
+  selex_arrays <- array(dim = c(dim(sims_array)[2], dim(sims_array)[1], dim(sims_array)[4], dim(sims_array)[3]))
+  dimnames(selex_arrays) <- list(dimnames(sims_array)[[2]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], dimnames(sims_array)[[3]])
+  print(dimnames(selex_arrays))
   
   for (i in 1:(dim(sims_array)[2])) {
     selex_array <- test_step(sims_array, i, method_idx, alpha, t_groups)
+    p_group <- dimnames(sims_array)[[2]][i]
     
     if (mode == 2) {
       selex_array <- filter_true_selex(selex_array, p_group, F)
@@ -286,16 +288,17 @@ omnires_test <- function(sims_array, method_idx, alpha, mode = 1, t_groups = GRO
 # OUTPUT:
 # detex_array: whether or not any detection is made at a given method/iteration/size.
 detex_selex <- function(selex_array) {
+  norm <- dim(selex_array)[1]
   if (length(dim(selex_array)) > 2) {
     # Start by collapsing the test group dimension into 1 on whether or not a detection is made.
     selex_array <- apply(selex_array, c(1,2), sum)
     selex_array[selex_array >= 1] <- 1
-    detex_array <- apply(selex_array, 2, sum)/200
+    detex_array <- apply(selex_array, 2, sum)/norm
   } else {
     # Set margins based on signal sizes
     selex_array <- apply(selex_array, 1, sum)
     selex_array[selex_array >= 1] <- 1
-    detex_array <- selex_array/200
+    detex_array <- selex_array/norm
   }
   
   return(detex_array)
@@ -345,14 +348,14 @@ mean_selex <- function(selex_array) {
 # lens: sum_selex, mean_selex, or detex_selex. Default: detex_selex.
 viz_fitter <- function(selex_arrays, lens = detex_selex) {
   viz_mat <- data.frame()
-  for (i in 1:dim(selex_arrays)[1]) {
+  for (i in dim(selex_arrays)[1]:1) {
     selex_mat <- lens(selex_arrays[i,,,])
     selex_mat <- cbind(selex_mat, dimnames(selex_arrays)[[3]], rep(dimnames(selex_arrays)[[1]][i], length(selex_mat)))
     viz_mat <- rbind(viz_mat, selex_mat)
   }
-  colnames(viz_mat) <- c("detex", "size", "method")
+  colnames(viz_mat) <- c("Detex", "Size", "Comp")
   rownames(viz_mat) <- 1:dim(viz_mat)[1]
-  viz_mat$detex <- as.numeric(viz_mat$detex)
-  viz_mat$size <- as.numeric(viz_mat$size)
+  viz_mat$Detex <- as.numeric(viz_mat$Detex)
+  viz_mat$Size <- as.numeric(viz_mat$Size)
   return(viz_mat)
 }
