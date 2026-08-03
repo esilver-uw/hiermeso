@@ -37,8 +37,8 @@ THETA[lower.tri(THETA)] = t(THETA)[lower.tri(THETA)]
 # sim_array: a single iteration simulation array.
 array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
   sim_array <- array(dim = c(length(p_groups), dim(GROUPS[[4]])[1], length(SIGNAL.SIZES), 11))
-  dimnames(sim_array) <- dimnames(sim_arrays) <- list(1:200, c("res_1_group_2", "res_2_group_2", "res_3_group_3"), GROUPS[[4]]$res_Group, SIGNAL.SIZES,
-                                                      c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3")) 
+  dimnames(sim_array) <- list(1:200, c("res_1_group_2", "res_2_group_2", "res_3_group_3"), GROUPS[[4]]$res_Group, SIGNAL.SIZES,
+                              c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3")) 
   A1 <- sample_network(THETA, N)
   # A1 Sample-wise Mean
   A1_sm <- apply(A1, c(1,2), mean)
