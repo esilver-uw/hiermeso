@@ -226,7 +226,7 @@ omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS
   dimnames(selex_arrays) <- list(dimnames(sims_array)[[5]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], dimnames(sims_array)[[3]])
   
   # Array to conform p_value array to the rest.
-  dummy_array <- array(0, dim = c(200, 10, 46))
+  dummy_array <- array(0, dim = c(dim(sims_array)[1], dim(sims_array)[4], 46))
   dimnames(dummy_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], GROUPS[[4]]$res_Group[GROUPS[[4]]$Resolution != 1])
     
   selex_array <- abind(p_value_test(sims_array, p_group_num, alpha, mode), dummy_array)
