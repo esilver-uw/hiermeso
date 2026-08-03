@@ -265,7 +265,6 @@ omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS
 omnires_test <- function(sims_array, method_idx, alpha, mode = 1, t_groups = GROUPS) {
   selex_arrays <- array(dim = c(dim(sims_array)[2], dim(sims_array)[1], dim(sims_array)[4], dim(sims_array)[3]))
   dimnames(selex_arrays) <- list(dimnames(sims_array)[[2]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], dimnames(sims_array)[[3]])
-  print(dimnames(selex_arrays))
   
   for (i in 1:(dim(sims_array)[2])) {
     selex_array <- test_step(sims_array, i, method_idx, alpha, t_groups)
