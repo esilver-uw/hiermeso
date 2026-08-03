@@ -15,7 +15,7 @@ SIGMA <- 25
 N.SIZE <- 64
 N <- 20
 GROUP.SIZES <- c(4,8,16)
-SIGNAL.SIZES <- 1:10
+SIGNAL.SIZES <- 0:15
 source("utils.R")
 source("e_procedures.R")
 
@@ -155,8 +155,8 @@ test_methods_step <- function(sim_array, p_group, size_idx, method_idxs = 2:11, 
 # OUTPUT: 
 # selex_array: an array of test group selections by iteration and size.
 test_step <- function(sims_array, p_group_num, method_idx, alpha, t_groups = GROUPS) {
-  
   selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], dim(sims_array)[3]))
+  dimnames(selex_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups$res_Groups)
   
   for (i in 1:dim(sims_array)[1]) {
     for (j in 1:dim(sims_array)[4]) {
@@ -164,7 +164,6 @@ test_step <- function(sims_array, p_group_num, method_idx, alpha, t_groups = GRO
       selex_array[i,j,] <- elp(e_vals, t_groups, alpha)
     }
   }
-  dimnames(selex_array) <- list(1:dim(sims_array)[1], SIGNAL.SIZES, GROUPS[[4]]$res_Group)
   
   return(selex_array)
 }
@@ -226,7 +225,7 @@ omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS
   dimnames(selex_arrays) <- list(dimnames(sims_array)[[5]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], dimnames(sims_array)[[3]])
   
   # Array to conform p_value array to the rest.
-  dummy_array <- array(0, dim = c(dim(sims_array)[1], dim(sims_array)[4], 46))
+  dummy_array <- array(0, dim = c(dim(sims_array)[1], dim(sims_array)[4], length(GROUPS[[4]]$res_Group[GROUPS[[4]]$Resolution != 1])))
   dimnames(dummy_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], GROUPS[[4]]$res_Group[GROUPS[[4]]$Resolution != 1])
     
   selex_array <- abind(p_value_test(sims_array, p_group_num, alpha, mode), dummy_array)
