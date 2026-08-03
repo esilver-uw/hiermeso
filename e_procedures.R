@@ -23,14 +23,14 @@ cal_kappa <- function(p_value, k) {
   if (p_value > 0 & p_value < 1) {
     e_value <- k*p_value^(k-1)
   } else if (p_value == 0) {
-    e_value <- 1e+15
+    e_value <- 1e+10
   } else if (p_value == 1) {
     e_value <- 0.5
   }
   
   # Threshold cutoff
-  if (e_value >= 1e+15) {
-    e_value <- 1e+15
+  if (e_value >= 1e+10) {
+    e_value <- 1e+10
   }
   
   return(e_value)
@@ -47,14 +47,14 @@ cal_mixture <- function(p_value) {
     denom <- p_value * (-log(p_value))^2
     e_value <- num/denom
   } else if (p_value == 0) {
-    e_value <- 1e+15
+    e_value <- 1e+10
   } else if (p_value == 1) {
     e_value <- 0.5
   }
   
   # Threshold cutoff
-  if (e_value >= 1e+15) {
-    e_value <- 1e+15
+  if (e_value >= 1e+10) {
+    e_value <- 1e+10
   }
   
   return(e_value)
@@ -74,8 +74,8 @@ lr_delta <- function(d_bar, m, pt) {
   e_value <- (exp(obs_term - delta_term) + exp(-obs_term - delta_term))/2
   
   # Threshold cutoff
-  if (e_value >= 1e+15) {
-    e_value <- 1e+15
+  if (e_value >= 1e+10) {
+    e_value <- 1e+10
   }
   
   return(e_value)
@@ -101,8 +101,8 @@ lr_prior <- function(d_bar, m, ps) {
   e_value <- norm_term * exp(exp_term_num/exp_term_denom)
   
   # Threshold cutoff
-  if (e_value >= 1e+15) {
-    e_value <- 1e+15
+  if (e_value >= 1e+10) {
+    e_value <- 1e+10
   }
   
   return(e_value)

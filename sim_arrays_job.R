@@ -8,6 +8,6 @@ job_num <- args[2]
 
 source("sim_utils.R")
 
-sim_arrays <- batchable_array(ct, c("res_1_group_2", "res_2_group_2", "res_3_group_3"))
+sim_arrays <- batchable_array(ct, c("res_1_group_2", "res_2_group_2", "res_3_group_2"))
 
 saveRDS(sim_arrays, file = paste("outputs/sim_arrays_", job_num, ".RData", sep=""))

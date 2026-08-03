@@ -256,7 +256,7 @@ omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS
 # Performs e-value testing on multiple iterations on a simulation array across perturbation groups on a single method.
 # INPUT: 
 # sims_array: a multiple-iteration simulation array.
-# method_idx
+# method_idx: method to consider.
 # alpha: alpha level.
 # mode: 1 for no filtering, 2 for true filtering, 3 for semi-true filtering. Default: 1.
 # t_groups: groups to consider.
