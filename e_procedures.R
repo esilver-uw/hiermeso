@@ -32,6 +32,9 @@ cal_kappa <- function(p_value, k) {
   if (e_value >= 1e+10) {
     e_value <- 1e+10
   }
+  if (e_value <= 1e-5) {
+    e_value <- 1e-5
+  }
   
   return(e_value)
 }
@@ -56,6 +59,9 @@ cal_mixture <- function(p_value) {
   if (e_value >= 1e+10) {
     e_value <- 1e+10
   }
+  if (e_value <= 1e-5) {
+    e_value <- 1e-5
+  }
   
   return(e_value)
 }
@@ -76,6 +82,9 @@ lr_delta <- function(d_bar, m, pt) {
   # Threshold cutoff
   if (e_value >= 1e+10) {
     e_value <- 1e+10
+  }
+  if (e_value <= 1e-5) {
+    e_value <- 1e-5
   }
   
   return(e_value)
@@ -103,6 +112,9 @@ lr_prior <- function(d_bar, m, ps) {
   # Threshold cutoff
   if (e_value >= 1e+10) {
     e_value <- 1e+10
+  }
+  if (e_value <= 1e-5) {
+    e_value <- 1e-5
   }
   
   return(e_value)
