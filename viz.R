@@ -89,8 +89,8 @@ viz_fitter <- function(selex_arrays, lens = detex_selex) {
 # OUTPUT:
 # none- plots a graph.
 # Plot n procedures
-detex_plot <- function(viz_mat, methods) {
-  viz_mat <- viz_mat[viz_mat$method %in% methods]
+detex_plot <- function(viz_mat, methods = c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3")) {
+  viz_mat <- viz_mat[viz_mat$Comp %in% methods,]
   ggplot() +
     geom_path(mapping = aes(x = viz_mat$Size, y = viz_mat$Detex, colour = viz_mat$Comp, group = viz_mat$Comp)) +
     xlab(label = "Signal Size") + ylab(label = "Proportion of Rejections") +
@@ -110,40 +110,62 @@ res_plot <- function(viz_mat) {
 
 # Load in data as from sim_arrays_job.R
 
-JOB.NUM <- 1
+JOB.NUM <- 2
 
-sims_array <- readRDS(paste0("sim_arrays_", JOB.NUM, ".RData"))
+sims_array <- readRDS(paste0("outputs/sim_arrays_", JOB.NUM, ".RData"))
 
 # Selection Arrays
 selex_array_1 <- omnibus_test(sims_array, "res_1_group_2", 0.05, 2)
 selex_array_2 <- omnibus_test(sims_array, "res_2_group_2", 0.05, 2)
-selex_array_3 <- omnibus_test(sims_array, "res_3_group_2", 0.05, 2)
+selex_array_3 <- omnibus_test(sims_array, "res_3_group_3", 0.05, 2)
+
+saveRDS(selex_array_1, "outputs/selex_array_1_vm.RData")
+saveRDS(selex_array_2, "outputs/selex_array_2_vm.RData")
+saveRDS(selex_array_3, "outputs/selex_array_3_vm.RData")
 
 # Method Arrays
 method_array_2 <- omnires_test(sims_array, 2, 0.05, 2)
-method_array_3 <- omnires_test(sims_array, 3, 0.05, 2)
-method_array_4 <- omnires_test(sims_array, 4, 0.05, 2)
+# method_array_3 <- omnires_test(sims_array, 3, 0.05, 2)
+# method_array_4 <- omnires_test(sims_array, 4, 0.05, 2)
 method_array_5 <- omnires_test(sims_array, 5, 0.05, 2)
 method_array_6 <- omnires_test(sims_array, 6, 0.05, 2)
-method_array_7 <- omnires_test(sims_array, 7, 0.05, 2)
+# method_array_7 <- omnires_test(sims_array, 7, 0.05, 2)
 method_array_8 <- omnires_test(sims_array, 8, 0.05, 2)
 method_array_9 <- omnires_test(sims_array, 9, 0.05, 2)
 method_array_10 <- omnires_test(sims_array, 10, 0.05, 2)
-method_array_11 <- omnires_test(sims_array, 11, 0.05, 2)
+# method_array_11 <- omnires_test(sims_array, 11, 0.05, 2)
+
+saveRDS(method_array_2, "outputs/method_array_2_vm.RData")
+saveRDS(method_array_5, "outputs/method_array_5_vm.RData")
+saveRDS(method_array_6, "outputs/method_array_6_vm.RData")
+saveRDS(method_array_8, "outputs/method_array_8_vm.RData")
+saveRDS(method_array_9, "outputs/method_array_9_vm.RData")
+saveRDS(method_array_10, "outputs/method_array_10_vm.RData")
 
 # Plots
 
-detex_plot(selex_array_1)
-detex_plot(selex_array_2)
-detex_plot(selex_array_3)
+viz_sa_1 <- viz_fitter(selex_array_1)
+viz_sa_2 <- viz_fitter(selex_array_2)
+viz_sa_3 <- viz_fitter(selex_array_3)
+
+detex_plot(viz_sa_1)
+detex_plot(viz_sa_2)
+detex_plot(viz_sa_3)
+
+viz_ma_2
+viz_ma_5
+viz_ma_6
+viz_ma_8
+viz_ma_9
+viz_ma_10
 
 res_plot(method_array_2)
-res_plot(method_array_3)
-res_plot(method_array_4)
+# res_plot(method_array_3)
+# res_plot(method_array_4)
 res_plot(method_array_5)
 res_plot(method_array_6)
-res_plot(method_array_7)
+# res_plot(method_array_7)
 res_plot(method_array_8)
 res_plot(method_array_9)
 res_plot(method_array_10)
-res_plot(method_array_11)
+# res_plot(method_array_11)
