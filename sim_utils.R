@@ -15,7 +15,8 @@ SIGMA <- 25
 N.SIZE <- 64
 N <- 20
 GROUP.SIZES <- c(4,8,16)
-SIGNAL.SIZES <- 0:15
+# SIGNAL.SIZES <- 0:15
+SIGNAL.SIZES <- 0
 source("utils.R")
 source("e_procedures.R")
 
@@ -38,7 +39,7 @@ THETA[lower.tri(THETA)] = t(THETA)[lower.tri(THETA)]
 array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
   sim_array <- array(dim = c(length(p_groups), dim(GROUPS[[4]])[1], length(SIGNAL.SIZES), 11))
   dimnames(sim_array) <- list(p_groups, GROUPS[[4]]$res_Group, SIGNAL.SIZES,
-                              c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3")) 
+                              c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_mean_1", "lr_mean_2", "lr_mean_3", "lr_prior_1", "lr_prior_2", "lr_prior_3")) 
   A1 <- sample_network(THETA, N)
   # A1 Sample-wise Mean
   A1_sm <- apply(A1, c(1,2), mean)
@@ -81,16 +82,16 @@ array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
         cal_mix <- cal_mixture(p_val)
         
         pts <- c(2.5, 5, 7.5)
-        lr_delta_1 <- lr_delta(d_bar, m, pts[1])
-        lr_delta_2 <- lr_delta(d_bar, m, pts[2])
-        lr_delta_3 <- lr_delta(d_bar, m, pts[3])
+        lr_mean_1 <- lr_delta(d_bar, m, pts[1])
+        lr_mean_2 <- lr_delta(d_bar, m, pts[2])
+        lr_mean_3 <- lr_delta(d_bar, m, pts[3])
         
-        priors <- c(10, 25, 50)
+        priors <- c(5, 20, 35)
         lr_prior_1 <- lr_prior(d_bar, m, priors[1])
         lr_prior_2 <- lr_prior(d_bar, m, priors[2])
         lr_prior_3 <- lr_prior(d_bar, m, priors[3])
         
-        sim_array[j,k,i,] <- c(p_val, cal_kappa_1, cal_kappa_2, cal_kappa_3, cal_mix, lr_delta_1, lr_delta_2, lr_delta_3, lr_prior_1, lr_prior_2, lr_prior_3)
+        sim_array[j,k,i,] <- c(p_val, cal_kappa_1, cal_kappa_2, cal_kappa_3, cal_mix, lr_mean_1, lr_mean_2, lr_mean_3, lr_prior_1, lr_prior_2, lr_prior_3)
       }
     }
   }
@@ -111,38 +112,8 @@ batchable_array <- function(ct, p_groups = GROUPS[[4]]$res_Group) {
   }
   
   dimnames(sims_array) <- list(1:ct, p_groups, GROUPS[[4]]$res_Group, SIGNAL.SIZES,
-                               c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3"))
+                               c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_mean_1", "lr_mean_2", "lr_mean_3", "lr_prior_1", "lr_prior_2", "lr_prior_3"))
   return(sims_array)
-}
-
-# Performs e-value testing over a vector of method indices for one iteration simulation array at a perturbation group and size combination.
-# INPUT: 
-# sim_array: a single simulation array
-# p_group: a single perturbation group to consider.
-# size_idx: a single size index to consider.
-# method_idxs: a vector of methods to consider (kappa calibrators (1-3), mixture calibrator (4), point likelihood ratios (1-3), prior likelihood ratios (1-3))
-# alpha: alpha level
-# OUTPUT: 
-# methods_selex: array of selections indexed by method.
-test_methods_step <- function(sim_array, p_group, size_idx, method_idxs = 2:11, alpha) {
-  # Remove 1 if present.
-  method_idxs <- method_idxs[!method_idxs == 1]
-  p_group_num <- which(GROUPS[[4]]$res_Group == p_group)
-  
-  methods_selex <- matrix(nrow = dim(GROUPS[[4]])[1], ncol = length(method_idxs))
-  
-  # Apply boosting treatment
-  
-  i <- 0
-  for (method_idx in method_idxs) {
-    i <- i + 1
-    e_vals <- sim_array[p_group,,size_idx,method_idx]
-    methods_selex[,i] <- elp(e_vals, GROUPS, alpha)
-  }
-  rownames(methods_selex) <- GROUPS[[4]]$res_Group
-  colnames(methods_selex) <- method_idxs
-  
-  return(methods_selex)
 }
 
 # Performs e-value testing on multiple iterations on a simulation array at a perturbation group and method combination.
@@ -155,12 +126,12 @@ test_methods_step <- function(sim_array, p_group, size_idx, method_idxs = 2:11, 
 # OUTPUT: 
 # selex_array: an array of test group selections by iteration and size.
 test_step <- function(sims_array, p_group_num, method_idx, alpha, t_groups = GROUPS) {
-  selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], dim(sims_array)[3]))
+  selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], dim(t_groups[[4]])[1]))
   dimnames(selex_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups$res_Groups)
   
   for (i in 1:dim(sims_array)[1]) {
     for (j in 1:dim(sims_array)[4]) {
-      e_vals <- sims_array[i,p_group_num,,j,method_idx]
+      e_vals <- sims_array[i,p_group_num,1:dim(t_groups[[4]])[1],j,method_idx]
       selex_array[i,j,] <- elp(e_vals, t_groups, alpha)
     }
   }
@@ -176,13 +147,14 @@ test_step <- function(sims_array, p_group_num, method_idx, alpha, t_groups = GRO
 # t_groups: groups to consider.
 # OUTPUT: 
 # selex_array: an array of test group selections by iteration and size.
-p_value_test <- function(sims_array, p_group_num, alpha, mode = 1, t_groups = GROUPS[[4]]$res_Group[GROUPS[[4]]$Resolution == 1]) {
-  selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], length(t_groups)))
-  dimnames(selex_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups)
+p_value_test <- function(sims_array, p_group_num, alpha, mode = 1, t_groups = GROUPS) {
+  t_groups_res_grp <- GROUPS[[4]]$res_Group[GROUPS[[4]]$Resolution == 1]
+  selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], length(t_groups_res_grp)))
+  dimnames(selex_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups_res_grp)
   
   for (i in 1:dim(sims_array)[1]) {
     for (j in 1:dim(sims_array)[4]) {
-      p_vals <- sims_array[i,p_group_num,1:length(t_groups),j,1]
+      p_vals <- sims_array[i,p_group_num,1:length(t_groups_res_grp),j,1]
       selex_array[i,j,] <- as.integer(p.adjust(p_vals, method = "BH") <= alpha)
     }
   }
@@ -192,12 +164,12 @@ p_value_test <- function(sims_array, p_group_num, alpha, mode = 1, t_groups = GR
 
 # Filters to include only true selections.
 # INPUT:
-# selex_array: an array of test group selections by iteration and size.
+# selex_arrays: an array of test group selections by method or group, iteration and size.
 # p_group: the true perturbation group.
 # semi-true: whether to also include 'semi-true' selections (selections which contain or are contained by the true perturbation group).
 # OUTPUT:
 # filtered_selex_array: a filtered array of test group selections by iteration and size.
-filter_true_selex <- function(selex_array, p_group, semi_true = F) {
+filter_true_selex <- function(selex_arrays, p_group, semi_true = F) {
   accept <- GROUPS[[2]][p_group][[1]]
   if (semi_true) {
     accept <- union(accept, GROUPS[[4]]$res_Group[sapply(GROUPS[[2]], function(x) p_group %in% x)])
@@ -205,7 +177,10 @@ filter_true_selex <- function(selex_array, p_group, semi_true = F) {
   
   true_idxs <- which(GROUPS[[4]]$res_Group %in% accept)
   
-  selex_array[,,-true_idxs] <- 0
+  for (i in 1:dim(selex_arrays)[1]) {
+    selex_array[i,,,-true_idxs] <- 0
+  }
+  
   return(selex_array)
 }
 
@@ -221,31 +196,19 @@ filter_true_selex <- function(selex_array, p_group, semi_true = F) {
 omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS) {
   p_group_num <- which(dimnames(sims_array)[[2]] == p_group)
   
-  selex_arrays <- array(dim = c(11, dim(sims_array)[1], dim(sims_array)[4], dim(sims_array)[3]))
-  dimnames(selex_arrays) <- list(dimnames(sims_array)[[5]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], dimnames(sims_array)[[3]])
+  selex_arrays <- array(dim = c(11, dim(sims_array)[1], dim(sims_array)[4], dim(t_groups[[4]])[1]))
+  dimnames(selex_arrays) <- list(dimnames(sims_array)[[5]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups[[4]]$res_Group)
   
   # Array to conform p_value array to the rest.
-  dummy_array <- array(0, dim = c(dim(sims_array)[1], dim(sims_array)[4], length(GROUPS[[4]]$res_Group[GROUPS[[4]]$Resolution != 1])))
-  dimnames(dummy_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], GROUPS[[4]]$res_Group[GROUPS[[4]]$Resolution != 1])
-    
-  selex_array <- abind(p_value_test(sims_array, p_group_num, alpha, mode), dummy_array)
-  
-  if (mode == 2) {
-    selex_array <- filter_true_selex(selex_array, p_group, F)
-  } else if (mode == 3) {
-    selex_array <- filter_true_selex(selex_array, p_group, T)
-  }
+  dummy_array <- array(0, dim = c(dim(sims_array)[1], dim(sims_array)[4], length(t_groups[[4]]$res_Group[t_groups[[4]]$Resolution != 1])))
+  dimnames(dummy_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups[[4]]$res_Group[t_groups[[4]]$Resolution != 1])
+
+  selex_array <- abind(p_value_test(sims_array, p_group_num, alpha, mode, t_groups), dummy_array)
   
   selex_arrays[1,,,] <- selex_array
   
   for (i in 2:(dim(sims_array)[5])) {
     selex_array <- test_step(sims_array, p_group_num, i, alpha, t_groups)
-    
-    if (mode == 2) {
-      selex_array <- filter_true_selex(selex_array, p_group, F)
-    } else if (mode == 3) {
-      selex_array <- filter_true_selex(selex_array, p_group, T)
-    }
     
     selex_arrays[i,,,] <- selex_array
   }
@@ -268,12 +231,6 @@ omnires_test <- function(sims_array, method_idx, alpha, mode = 1, t_groups = GRO
   for (i in 1:(dim(sims_array)[2])) {
     selex_array <- test_step(sims_array, i, method_idx, alpha, t_groups)
     p_group <- dimnames(sims_array)[[2]][i]
-    
-    if (mode == 2) {
-      selex_array <- filter_true_selex(selex_array, p_group, F)
-    } else if (mode == 3) {
-      selex_array <- filter_true_selex(selex_array, p_group, T)
-    }
     
     selex_arrays[i,,,] <- selex_array
   }

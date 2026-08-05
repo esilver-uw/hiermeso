@@ -5,3 +5,5 @@
 .positai
 old_sims/
 outputs/
+figures/
+.DS_Store

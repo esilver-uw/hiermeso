@@ -1,6 +1,7 @@
 # Read in data from simulation and generate the plots for presentation
 
 library(ggplot2)
+library(latex2exp)
 source("sim_utils.R")
 
 # THE LENSES: Two extremely basic apply wrappers.
@@ -89,23 +90,25 @@ viz_fitter <- function(selex_arrays, lens = detex_selex) {
 # OUTPUT:
 # none- plots a graph.
 # Plot n procedures
-detex_plot <- function(viz_mat, methods = c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_delta_1", "lr_delta_2", "lr_delta_3", "lr_prior_1", "lr_prior_2", "lr_prior_3")) {
+detex_plot <- function(viz_mat, title, methods = c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_mean_1", "lr_mean_2", "lr_mean_3", "lr_prior_1", "lr_prior_2", "lr_prior_3")) {
   viz_mat <- viz_mat[viz_mat$Comp %in% methods,]
   ggplot() +
     geom_path(mapping = aes(x = viz_mat$Size, y = viz_mat$Detex, colour = viz_mat$Comp, group = viz_mat$Comp)) +
     xlab(label = "Signal Size") + ylab(label = "Proportion of Rejections") +
     scale_colour_discrete(name = "Procedure") +
-    scale_x_discrete(limits = as.factor(unique(viz_mat$Size)))
+    scale_x_discrete(limits = as.factor(unique(viz_mat$Size))) +
+    labs(title = title)
 }
 
 # Plot n resolutions
-res_plot <- function(viz_mat) {
+res_plot <- function(viz_mat, title) {
   ggplot() + 
     geom_col(mapping = aes(x = viz_mat$Size, y = viz_mat$Detex, fill = viz_mat$Comp), position = position_identity()) +
     xlab(label = "Signal Size") +
     ylab(label = "Avg. Rejection Resolution") +
-    scale_colour_discrete(name = "Perturbation Size") +
-    scale_x_discrete(limits = as.factor(unique(viz_mat$Size)))
+    scale_fill_discrete(name = "Perturbation Size") +
+    scale_x_discrete(limits = as.factor(unique(viz_mat$Size))) +
+    labs(title = title)
 }
 
 # Load in data as from sim_arrays_job.R
@@ -121,6 +124,7 @@ selex_array_3 <- readRDS("outputs/selex_array_3_vm.RData")
 method_array_2 <- readRDS("outputs/method_array_2_vm.RData")
 method_array_5 <- readRDS("outputs/method_array_5.RData")
 method_array_6 <- readRDS("outputs/method_array_6_vm.RData")
+method_array_7 <- readRDS("outputs/method_array_7.RData")
 method_array_8 <- readRDS("outputs/method_array_8.RData")
 method_array_9 <- readRDS("outputs/method_array_9_vm.RData")
 method_array_10 <- readRDS("outputs/method_array_10.RData")
@@ -131,20 +135,27 @@ viz_sa_1 <- viz_fitter(selex_array_1)
 viz_sa_2 <- viz_fitter(selex_array_2)
 viz_sa_3 <- viz_fitter(selex_array_3)
 
-detex_plot(viz_sa_1)
-detex_plot(viz_sa_2)
-detex_plot(viz_sa_3)
+detex_plot(viz_sa_1, "Resolution 1 Detections")
+detex_plot(viz_sa_1, "Resolution 1 Detections", c("p_value", "lr_mean_3", "cal_kappa_1", "lr_prior_2", "cal_mix"))
+detex_plot(viz_sa_2, "Resolution 2 Detections")
+detex_plot(viz_sa_2, "Resolution 2 Detections", c("p_value", "lr_mean_2", "cal_kappa_1", "lr_prior_2", "cal_mix"))
+detex_plot(viz_sa_3, "Resolution 3 Detections")
+detex_plot(viz_sa_3, "Resolution 3 Detections", c("p_value", "lr_mean_1", "cal_kappa_1", "lr_prior_2", "cal_mix"))
 
 viz_ma_2 <- viz_fitter(method_array_2)
 viz_ma_5 <- viz_fitter(method_array_5)
 viz_ma_6 <- viz_fitter(method_array_6)
+viz_ma_7 <- viz_fitter(method_array_7)
 viz_ma_8 <- viz_fitter(method_array_8)
 viz_ma_9 <- viz_fitter(method_array_9)
 viz_ma_10 <- viz_fitter(method_array_10)
 
-res_plot(viz_ma_2)
-res_plot(viz_ma_5)
-res_plot(viz_ma_6)
-res_plot(viz_ma_8)
-res_plot(viz_ma_9)
-res_plot(viz_ma_10)
+res_plot(viz_ma_2, "Calibrator, k = 0.25")
+res_plot(viz_ma_5, "Calibrator, mixture")
+res_plot(viz_ma_6, "Likelihood Ratio, mean = 2.5")
+res_plot(viz_ma_7, "Likelihood Ratio, mean = 5")
+res_plot(viz_ma_8, "Likelihood Ratio, mean = 7.5")
+res_plot(viz_ma_9, "LR Mixture, prior sigma = 5")
+res_plot(viz_ma_10, "LR Mixture, prior sigma = 20")
+
+# False detex
