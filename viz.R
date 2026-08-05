@@ -1,7 +1,7 @@
 # Read in data from simulation and generate the plots for presentation
 
 library(ggplot2)
-library(latex2exp)
+library(gt)
 source("sim_utils.R")
 
 # THE LENSES: Two extremely basic apply wrappers.
@@ -63,11 +63,12 @@ mean_selex <- function(selex_array) {
   return(mean_array)
 }
 
-# need a function to stack methods vertically using rowbind. wrap filter and mean/sum to do that.
 # Fitter function for visualization.
 # INPUT: 
-# selex_arrays: a list of arrays of test group selections by iteration and size, indexed by method.
+# selex_arrays: a list of arrays of test group selections by iteration and size, indexed by method or group.
 # lens: sum_selex, mean_selex, or detex_selex. Default: detex_selex.
+# OUTPUT: 
+# viz_mat: a data.frame in the correct format for ggplot to group by method or group, with size as x and detections as y.
 viz_fitter <- function(selex_arrays, lens = detex_selex) {
   viz_mat <- data.frame()
   for (i in dim(selex_arrays)[1]:1) {
@@ -80,6 +81,16 @@ viz_fitter <- function(selex_arrays, lens = detex_selex) {
   viz_mat$Detex <- as.numeric(viz_mat$Detex)
   viz_mat$Size <- as.numeric(viz_mat$Size)
   return(viz_mat)
+}
+
+# Fitter function for FDR table.
+# INPUT: 
+# selex_arrays: a list of arrays of test group selections by iteration and size, indexed by method.
+# OUTPUT: 
+# fdr_mat: a data.frame of detections by method. 
+fdr_fitter <- function(selex_arrays) {
+  fdr_mat <- data.frame(t(apply(selex_arrays, 1, mean)))
+  return(fdr_mat)
 }
 
 # THE PLOTS
@@ -159,3 +170,11 @@ res_plot(viz_ma_9, "LR Mixture, prior sigma = 5")
 res_plot(viz_ma_10, "LR Mixture, prior sigma = 20")
 
 # False detex
+fdr_mat_1 <- fdr_fitter(fdr_selex_array_1)
+fdr_mat_2 <- fdr_fitter(fdr_selex_array_2)
+fdr_mat_3 <- fdr_fitter(fdr_selex_array_3)
+
+fdr_tbl <- rbind(fdr_mat_1, fdr_mat_2, fdr_mat_3)
+rownames <- c("P. Res. 1", "P. Res. 2", "P. Res. 3")
+fdr_tbl <- data.frame(cbind(rownames, fdr_tbl))
+gt(fdr_tbl) |> fmt_number(decimals = 5) |> gt_split(col_slice_at = 6)
