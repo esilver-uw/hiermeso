@@ -9,7 +9,7 @@ sims_array <- readRDS(paste0("outputs/sim_arrays_", JOB.NUM, "_vm.RData"))
 # Selection Arrays
 selex_array_1 <- omnibus_test(sims_array, "res_1_group_2", 0.05, 2)
 selex_array_2 <- omnibus_test(sims_array, "res_2_group_2", 0.05, 2)
-selex_array_3 <- omnibus_test(sims_array, "res_3_group_3", 0.05, 2)
+selex_array_3 <- omnibus_test(sims_array, "res_3_group_2", 0.05, 2)
 
 saveRDS(selex_array_1, "outputs/selex_array_1.RData")
 saveRDS(selex_array_2, "outputs/selex_array_2.RData")
