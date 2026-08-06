@@ -126,19 +126,19 @@ res_plot <- function(viz_mat, title) {
 
 # You may note '_vm' appended to certain files. I carried out simulations using both
 # a computer cluster and my laptop.
-selex_array_1 <- readRDS("outputs/selex_array_1_vm.RData")
-selex_array_2 <- readRDS("outputs/selex_array_2_vm.RData")
-selex_array_3 <- readRDS("outputs/selex_array_3_vm.RData")
+selex_array_1 <- readRDS("outputs/selex_array_1_vm_2.RData")
+selex_array_2 <- readRDS("outputs/selex_array_2_vm_2.RData")
+selex_array_3 <- readRDS("outputs/selex_array_3_vm_2.RData")
 
 # You may note '_vm' appended to certain files. I carried out simulations using both
 # a computer cluster and my laptop.
-method_array_2 <- readRDS("outputs/method_array_2_vm.RData")
-method_array_5 <- readRDS("outputs/method_array_5.RData")
-method_array_6 <- readRDS("outputs/method_array_6_vm.RData")
-method_array_7 <- readRDS("outputs/method_array_7.RData")
-method_array_8 <- readRDS("outputs/method_array_8.RData")
-method_array_9 <- readRDS("outputs/method_array_9_vm.RData")
-method_array_10 <- readRDS("outputs/method_array_10.RData")
+method_array_2 <- readRDS("outputs/method_array_2_vm_2.RData")
+method_array_5 <- readRDS("outputs/method_array_5_vm_2.RData")
+method_array_6 <- readRDS("outputs/method_array_6_vm_2.RData")
+method_array_7 <- readRDS("outputs/method_array_7_vm_2.RData")
+method_array_8 <- readRDS("outputs/method_array_8_vm_2.RData")
+method_array_9 <- readRDS("outputs/method_array_9_vm_2.RData")
+method_array_10 <- readRDS("outputs/method_array_10_vm_2.RData")
 
 # Plots
 
@@ -178,3 +178,23 @@ fdr_tbl <- rbind(fdr_mat_1, fdr_mat_2, fdr_mat_3)
 rownames <- c("P. Res. 1", "P. Res. 2", "P. Res. 3")
 fdr_tbl <- data.frame(cbind(rownames, fdr_tbl))
 gt(fdr_tbl) |> fmt_number(decimals = 6) |> gt_split(col_slice_at = 6)
+
+# Get true/false detections.
+
+td_array_1 <- filter_true_selex(selex_array_1, "res_1_group_2", T)
+fd_array_1 <- selex_array_1 - td_array_1
+td_array_2 <- filter_true_selex(selex_array_2, "res_2_group_2", T)
+fd_array_2 <- selex_array_2 - td_array_2
+td_array_3 <- filter_true_selex(selex_array_3, "res_3_group_2", T)
+fd_array_3 <- selex_array_3 - td_array_3
+
+# Get true detections for methods.
+
+td_mthd_2 <- filter_true_selex(method_array_2, semi_true = T)
+td_mthd_5 <- filter_true_selex(method_array_5, semi_true = T)
+td_mthd_6 <- filter_true_selex(method_array_6, semi_true = T)
+td_mthd_7 <- filter_true_selex(method_array_7, semi_true = T)
+td_mthd_8 <- filter_true_selex(method_array_8, semi_true = T)
+td_mthd_9 <- filter_true_selex(method_array_9, semi_true = T)
+td_mthd_10 <- filter_true_selex(method_array_10, semi_true = T)
+
