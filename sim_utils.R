@@ -169,8 +169,8 @@ p_value_test <- function(sims_array, p_group_num, alpha, mode = 1, t_groups = GR
 # semi-true: whether to also include 'semi-true' selections (selections which contain or are contained by the true perturbation group).
 # OUTPUT:
 # filtered_selex_array: a filtered array of test group selections by iteration and size.
-filter_true_selex <- function(selex_arrays, p_group = F, semi_true = F) {
-  if (p_group) {
+filter_true_selex <- function(selex_arrays, p_group = -1, semi_true = F) {
+  if (p_group != -1) {
     accept <- GROUPS[[2]][p_group][[1]]
     if (semi_true) {
       accept <- union(accept, GROUPS[[4]]$res_Group[sapply(GROUPS[[2]], function(x) p_group %in% x)])

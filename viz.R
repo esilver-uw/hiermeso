@@ -83,6 +83,24 @@ viz_fitter <- function(selex_arrays, lens = detex_selex) {
   return(viz_mat)
 }
 
+# Over signal sizes, for fixed p_group and method, get proportion of highest-res-rejections per resolution.
+res_fitter <- function(selex_arrays, comp_idx = 3) {
+  selex_array <- selex_arrays[comp_idx,,,,drop=T]
+  res_mat <- data.frame()
+  for (j in 1:dim(selex_array)[2]) {
+    res_mat <- rbind(res_mat, data.frame("Detex" = 0, "Size" = rep(dimnames(selex_array)[[2]][j], length(GROUP.SIZES)), "Comp" = 1:length(GROUP.SIZES)))
+  }
+  for (i in 1:dim(selex_array)[1]) {
+    for (j in 1:dim(selex_array)[2]) {
+      max_res <- max(selex_array[i,j,] * GROUPS[[4]]$Resolution)
+      row <- which(res_mat$Size == dimnames(selex_array)[[2]][j] & res_mat$Comp == max_res)
+      res_mat[row,1] <- res_mat[row,1] + 1
+    }
+  }
+  res_mat$Detex <- res_mat$Detex/dim(selex_array)[1]
+  return(res_mat)
+}
+
 # Fitter function for FDR table.
 # INPUT: 
 # selex_arrays: a list of arrays of test group selections by iteration and size, indexed by method.
@@ -112,9 +130,9 @@ detex_plot <- function(viz_mat, title, methods = c("p_value", "cal_kappa_1", "ca
 }
 
 # Plot n resolutions
-res_plot <- function(viz_mat, title) {
+res_plot <- function(viz_mat, title, pos = position_identity()) {
   ggplot() + 
-    geom_col(mapping = aes(x = viz_mat$Size, y = viz_mat$Detex, fill = viz_mat$Comp), position = position_identity()) +
+    geom_col(mapping = aes(x = viz_mat$Size, y = viz_mat$Detex, fill = as.factor(viz_mat$Comp)), position = pos) +
     xlab(label = "Signal Size") +
     ylab(label = "Avg. Rejection Resolution") +
     scale_fill_discrete(name = "Perturbation Size") +
@@ -140,11 +158,18 @@ method_array_8 <- readRDS("outputs/method_array_8_vm_2.RData")
 method_array_9 <- readRDS("outputs/method_array_9_vm_2.RData")
 method_array_10 <- readRDS("outputs/method_array_10_vm_2.RData")
 
-# Plots
+# Get true/false detections.
 
-viz_sa_1 <- viz_fitter(selex_array_1)
-viz_sa_2 <- viz_fitter(selex_array_2)
-viz_sa_3 <- viz_fitter(selex_array_3)
+td_array_1 <- filter_true_selex(selex_array_1, "res_1_group_2", T)
+fd_array_1 <- selex_array_1 - td_array_1
+td_array_2 <- filter_true_selex(selex_array_2, "res_2_group_2", T)
+fd_array_2 <- selex_array_2 - td_array_2
+td_array_3 <- filter_true_selex(selex_array_3, "res_3_group_2", T)
+fd_array_3 <- selex_array_3 - td_array_3
+
+viz_sa_1 <- viz_fitter(td_array_1)
+viz_sa_2 <- viz_fitter(td_array_2)
+viz_sa_3 <- viz_fitter(td_array_3)
 
 detex_plot(viz_sa_1, "Resolution 1 Detections")
 detex_plot(viz_sa_1, "Resolution 1 Detections", c("p_value", "lr_mean_3", "cal_kappa_1", "lr_prior_2", "cal_mix"))
@@ -152,6 +177,50 @@ detex_plot(viz_sa_2, "Resolution 2 Detections")
 detex_plot(viz_sa_2, "Resolution 2 Detections", c("p_value", "lr_mean_2", "cal_kappa_1", "lr_prior_2", "cal_mix"))
 detex_plot(viz_sa_3, "Resolution 3 Detections")
 detex_plot(viz_sa_3, "Resolution 3 Detections", c("p_value", "lr_mean_1", "cal_kappa_1", "lr_prior_2", "cal_mix"))
+
+# False detex
+fdr_mat_1 <- fdr_fitter(fd_array_1)
+fdr_mat_2 <- fdr_fitter(fd_array_2)
+fdr_mat_3 <- fdr_fitter(fd_array_3)
+
+fdr_tbl <- rbind(fdr_mat_1, fdr_mat_2, fdr_mat_3)
+rownames <- c("P. Res. 1", "P. Res. 2", "P. Res. 3")
+fdr_tbl <- data.frame(cbind(rownames, fdr_tbl))
+gt(fdr_tbl) |> fmt_number(decimals = 6) |> gt_split(col_slice_at = 6)
+
+# Get true detections for methods.
+
+td_mthd_2 <- filter_true_selex(method_array_2, semi_true = T)
+td_mthd_5 <- filter_true_selex(method_array_5, semi_true = T)
+td_mthd_6 <- filter_true_selex(method_array_6, semi_true = T)
+td_mthd_7 <- filter_true_selex(method_array_7, semi_true = T)
+td_mthd_8 <- filter_true_selex(method_array_8, semi_true = T)
+td_mthd_9 <- filter_true_selex(method_array_9, semi_true = T)
+td_mthd_10 <- filter_true_selex(method_array_10, semi_true = T)
+
+res_mat_2_3 <- res_fitter(td_mthd_2)
+res_mat_5_3 <- res_fitter(td_mthd_5)
+res_mat_6_3 <- res_fitter(td_mthd_6)
+res_mat_7_3 <- res_fitter(td_mthd_7)
+res_mat_8_3 <- res_fitter(td_mthd_8)
+res_mat_9_3 <- res_fitter(td_mthd_9)
+res_mat_10_3 <- res_fitter(td_mthd_10)
+res_mat_2_2 <- res_fitter(td_mthd_2, 2)
+res_mat_5_2 <- res_fitter(td_mthd_5, 2)
+res_mat_6_2 <- res_fitter(td_mthd_6, 2)
+res_mat_7_2 <- res_fitter(td_mthd_7, 2)
+res_mat_8_2 <- res_fitter(td_mthd_8, 2)
+res_mat_9_2 <- res_fitter(td_mthd_9, 2)
+res_mat_10_2 <- res_fitter(td_mthd_10, 2)
+res_mat_2_1 <- res_fitter(td_mthd_2, 1)
+res_mat_5_1 <- res_fitter(td_mthd_5, 1)
+res_mat_6_1 <- res_fitter(td_mthd_6, 1)
+res_mat_7_1 <- res_fitter(td_mthd_7, 1)
+res_mat_8_1 <- res_fitter(td_mthd_8, 1)
+res_mat_9_1 <- res_fitter(td_mthd_9, 1)
+res_mat_10_1 <- res_fitter(td_mthd_10, 1)
+
+res_plot(res_mat_2, "nada", position_stack())
 
 viz_ma_2 <- viz_fitter(method_array_2)
 viz_ma_5 <- viz_fitter(method_array_5)
@@ -168,33 +237,3 @@ res_plot(viz_ma_7, "Likelihood Ratio, mean = 5")
 res_plot(viz_ma_8, "Likelihood Ratio, mean = 7.5")
 res_plot(viz_ma_9, "LR Mixture, prior sigma = 5")
 res_plot(viz_ma_10, "LR Mixture, prior sigma = 20")
-
-# False detex
-fdr_mat_1 <- fdr_fitter(fdr_selex_array_1)
-fdr_mat_2 <- fdr_fitter(fdr_selex_array_2)
-fdr_mat_3 <- fdr_fitter(fdr_selex_array_3)
-
-fdr_tbl <- rbind(fdr_mat_1, fdr_mat_2, fdr_mat_3)
-rownames <- c("P. Res. 1", "P. Res. 2", "P. Res. 3")
-fdr_tbl <- data.frame(cbind(rownames, fdr_tbl))
-gt(fdr_tbl) |> fmt_number(decimals = 6) |> gt_split(col_slice_at = 6)
-
-# Get true/false detections.
-
-td_array_1 <- filter_true_selex(selex_array_1, "res_1_group_2", T)
-fd_array_1 <- selex_array_1 - td_array_1
-td_array_2 <- filter_true_selex(selex_array_2, "res_2_group_2", T)
-fd_array_2 <- selex_array_2 - td_array_2
-td_array_3 <- filter_true_selex(selex_array_3, "res_3_group_2", T)
-fd_array_3 <- selex_array_3 - td_array_3
-
-# Get true detections for methods.
-
-td_mthd_2 <- filter_true_selex(method_array_2, semi_true = T)
-td_mthd_5 <- filter_true_selex(method_array_5, semi_true = T)
-td_mthd_6 <- filter_true_selex(method_array_6, semi_true = T)
-td_mthd_7 <- filter_true_selex(method_array_7, semi_true = T)
-td_mthd_8 <- filter_true_selex(method_array_8, semi_true = T)
-td_mthd_9 <- filter_true_selex(method_array_9, semi_true = T)
-td_mthd_10 <- filter_true_selex(method_array_10, semi_true = T)
-
