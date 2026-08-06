@@ -167,6 +167,10 @@ method_array_8 <- readRDS("outputs/method_array_8_vm_2.RData")
 method_array_9 <- readRDS("outputs/method_array_9_vm_2.RData")
 method_array_10 <- readRDS("outputs/method_array_10_vm_2.RData")
 
+fdr_selex_array_1 <- readRDS("outputs/fdr_selex_array_1_vm_2.RData")
+fdr_selex_array_2 <- readRDS("outputs/fdr_selex_array_2_vm_2.RData")
+fdr_selex_array_3 <- readRDS("outputs/fdr_selex_array_3_vm_2.RData")
+
 # Get true/false detections.
 
 td_array_1 <- filter_true_selex(selex_array_1, "res_1_group_2", T)
