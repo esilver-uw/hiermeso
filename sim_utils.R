@@ -167,9 +167,10 @@ p_value_test <- function(sims_array, p_group_num, alpha, mode = 1, t_groups = GR
 # selex_arrays: an array of test group selections by method or group, iteration and size.
 # p_group: the true perturbation group.
 # semi-true: whether to also include 'semi-true' selections (selections which contain or are contained by the true perturbation group).
+# false: reverse polarity-- filter out true selections.
 # OUTPUT:
 # filtered_selex_array: a filtered array of test group selections by iteration and size.
-filter_true_selex <- function(selex_arrays, p_group = -1, semi_true = F) {
+filter_true_selex <- function(selex_arrays, p_group = -1, semi_true = F, false = F) {
   if (p_group != -1) {
     accept <- GROUPS[[2]][p_group][[1]]
     if (semi_true) {
@@ -179,7 +180,11 @@ filter_true_selex <- function(selex_arrays, p_group = -1, semi_true = F) {
     true_idxs <- which(GROUPS[[4]]$res_Group %in% accept)
     
     for (i in 1:dim(selex_arrays)[1]) {
-      selex_arrays[i,,,-true_idxs] <- 0
+      if (false) {
+        selex_arrays[i,,,true_idxs] <- 0
+      } else {
+        selex_arrays[i,,,-true_idxs] <- 0
+      }
     }
   } else {
     for (i in 1:dim(selex_arrays)[1]) {
@@ -192,7 +197,11 @@ filter_true_selex <- function(selex_arrays, p_group = -1, semi_true = F) {
       
       true_idxs <- which(GROUPS[[4]]$res_Group %in% accept)
       
-      selex_arrays[i,,,-true_idxs] <- 0
+      if (false) {
+        selex_arrays[i,,,true_idxs] <- 0
+      } else {
+        selex_arrays[i,,,-true_idxs] <- 0
+      }
     }
   }
   

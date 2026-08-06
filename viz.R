@@ -84,6 +84,10 @@ viz_fitter <- function(selex_arrays, lens = detex_selex) {
 }
 
 # Over signal sizes, for fixed p_group and method, get proportion of highest-res-rejections per resolution.
+# INPUT: 
+# selex_arrays: a list of arrays of test group selections by iteration and size, indexed by group.
+# OUTPUT: 
+# res_mat: a data.frame in the correct format for ggplot to group by resolution, with size as x and detections as y.
 res_fitter <- function(selex_arrays, comp_idx = 3) {
   selex_array <- selex_arrays[comp_idx,,,,drop=T]
   res_mat <- data.frame()
@@ -106,9 +110,12 @@ res_fitter <- function(selex_arrays, comp_idx = 3) {
 # selex_arrays: a list of arrays of test group selections by iteration and size, indexed by method.
 # OUTPUT: 
 # fdr_mat: a data.frame of detections by method. 
-fdr_fitter <- function(selex_arrays) {
-  fdr_mat <- data.frame(t(apply(selex_arrays, 1, mean)))
-  return(fdr_mat)
+fdr_fitter <- function(selex_arrays, fd_arrays) {
+  # Per iteration, if it makes a rejection, make it 1, if it doesn't, make it 0
+  fdr_mat <- apply(fd_arrays, c(1,2), sum)/apply(selex_arrays, c(1,2), sum)
+  fdr_vec <- apply(fdr_mat, 1, sum)/200
+  fdr_vec[is.nan(fdr_vec)] <- 0
+  return(fdr_vec)
 }
 
 # THE PLOTS
@@ -130,15 +137,17 @@ detex_plot <- function(viz_mat, title, methods = c("p_value", "cal_kappa_1", "ca
 }
 
 # Plot n resolutions
-res_plot <- function(viz_mat, title, pos = position_identity()) {
+res_plot <- function(viz_mat, title, pos = position_stack(reverse = T)) {
   ggplot() + 
     geom_col(mapping = aes(x = viz_mat$Size, y = viz_mat$Detex, fill = as.factor(viz_mat$Comp)), position = pos) +
     xlab(label = "Signal Size") +
     ylab(label = "Avg. Rejection Resolution") +
-    scale_fill_discrete(name = "Perturbation Size") +
+    scale_fill_discrete(name = "Detection Size") +
     scale_x_discrete(limits = as.factor(unique(viz_mat$Size))) +
     labs(title = title)
 }
+
+# Consider a plot of rejection coverage.
 
 # Load in data as from sim_arrays_job.R
 
@@ -161,11 +170,11 @@ method_array_10 <- readRDS("outputs/method_array_10_vm_2.RData")
 # Get true/false detections.
 
 td_array_1 <- filter_true_selex(selex_array_1, "res_1_group_2", T)
-fd_array_1 <- selex_array_1 - td_array_1
+fd_array_1 <- filter_true_selex(selex_array_1, "res_1_group_2", T, T)
 td_array_2 <- filter_true_selex(selex_array_2, "res_2_group_2", T)
-fd_array_2 <- selex_array_2 - td_array_2
+fd_array_2 <- filter_true_selex(selex_array_2, "res_2_group_2", T, T)
 td_array_3 <- filter_true_selex(selex_array_3, "res_3_group_2", T)
-fd_array_3 <- selex_array_3 - td_array_3
+fd_array_3 <- filter_true_selex(selex_array_3, "res_3_group_2", T, T)
 
 viz_sa_1 <- viz_fitter(td_array_1)
 viz_sa_2 <- viz_fitter(td_array_2)
@@ -220,7 +229,9 @@ res_mat_8_1 <- res_fitter(td_mthd_8, 1)
 res_mat_9_1 <- res_fitter(td_mthd_9, 1)
 res_mat_10_1 <- res_fitter(td_mthd_10, 1)
 
-res_plot(res_mat_2, "nada", position_stack())
+res_plot(res_mat_2_1, "Res 2 at Res 1")
+res_plot(res_mat_2_2, "Res 2 at Res 2")
+res_plot(res_mat_2_3, "Res 2 at Res 3")
 
 viz_ma_2 <- viz_fitter(method_array_2)
 viz_ma_5 <- viz_fitter(method_array_5)
@@ -230,10 +241,10 @@ viz_ma_8 <- viz_fitter(method_array_8)
 viz_ma_9 <- viz_fitter(method_array_9)
 viz_ma_10 <- viz_fitter(method_array_10)
 
-res_plot(viz_ma_2, "Calibrator, k = 0.25")
-res_plot(viz_ma_5, "Calibrator, mixture")
-res_plot(viz_ma_6, "Likelihood Ratio, mean = 2.5")
-res_plot(viz_ma_7, "Likelihood Ratio, mean = 5")
-res_plot(viz_ma_8, "Likelihood Ratio, mean = 7.5")
-res_plot(viz_ma_9, "LR Mixture, prior sigma = 5")
-res_plot(viz_ma_10, "LR Mixture, prior sigma = 20")
+res_plot(viz_ma_2, "Calibrator, k = 0.25", position_identity())
+res_plot(viz_ma_5, "Calibrator, mixture", position_identity())
+res_plot(viz_ma_6, "Likelihood Ratio, mean = 2.5", position_identity())
+res_plot(viz_ma_7, "Likelihood Ratio, mean = 5", position_identity())
+res_plot(viz_ma_8, "Likelihood Ratio, mean = 7.5", position_identity())
+res_plot(viz_ma_9, "LR Mixture, prior sigma = 5", position_identity())
+res_plot(viz_ma_10, "LR Mixture, prior sigma = 20", position_identity())
