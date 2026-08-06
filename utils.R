@@ -11,7 +11,7 @@ Mode <- function(x) {
 
 # Create groups for upper triangle, inspired by KeLP architecture.
 # INPUT:
-# GROUP_SIZES: vector of group sizes.
+# group_sizes: vector of group sizes.
 # n: number of nodes.
 # OUTPUT:
 # for L length of GROUP_SIZES
@@ -19,9 +19,9 @@ Mode <- function(x) {
 # node_groups: data frame of dimension n x L specifying node-group membership for each node.
 # nodes_edge: data frame of dimension n^2 x 3 linking node pairs to edges.
 # group_info: data frame containing group, level, and group-level for each group.
-generate_groups <- function(GROUP_SIZES, n) {
+generate_groups <- function(group_sizes, n) {
   # number of levels
-  L <- length(GROUP_SIZES)
+  L <- length(group_sizes)
   
   # nodes_edge
   nodes_edge <- NULL
@@ -32,24 +32,28 @@ generate_groups <- function(GROUP_SIZES, n) {
   }
   
   # groups will be all combinations of node_groups. 
-  groups <- NULL
-  groups <- cbind(matrix(0, n^2, L), expand.grid(1:n,1:n))
+  upper_mask <- matrix(1:n^2, nrow = n)[upper.tri(matrix(1:n^2, nrow = n), T)]
+  groups <- cbind(matrix(0, n^2, length(group_sizes)), expand.grid(1:n,1:n))
   for (l in 1:L) {
-    index <- 1
-    for (i in 1:(n/GROUP_SIZES[l])) {
-      i_valid <- (i*GROUP_SIZES[l]) + 1 - 1:GROUP_SIZES[l]
-      for (j in i:(n/GROUP_SIZES[l])) {
-        # Group size is tolerance frame. If
-        j_valid <- (j*GROUP_SIZES[l]) + 1 - 1:GROUP_SIZES[l]
-        # groups[(nodes_edge[,1] %in% i_valid & nodes_edge[,2] %in% j_valid) | (nodes_edge[,1] %in% j_valid & nodes_edge[,2] %in% i_valid),l] <- index
-        groups[(nodes_edge[,1] %in% i_valid & nodes_edge[,2] %in% j_valid),l] <- index
-        index <- index + 1
+    g <- 0
+    group_size <- group_sizes[l]
+    group_nodes <- split(1:n, ceiling(1:n/group_size))
+    for (i in 1:ceiling(n/group_size)) {
+      for (j in 1:ceiling(n/group_size)) {
+        pairs <- as.matrix(expand.grid(group_nodes[[i]], group_nodes[[j]]))
+        group <- intersect(matrix(1:n^2, nrow = n)[pairs], upper_mask)
+        if (length(group)) {
+          g <- g + 1
+          for (k in group) {
+            groups[k,l] <- g
+          }
+        }
       }
     }
   }
   
-  # me caveman. me de-duplicate up to ordering.
-  groups <- groups[groups[,L+1] %in% nodes_edge[,1] & groups[,L+2] %in% nodes_edge[,2],1:3]
+  # Remove empty rows
+  groups <- groups[which(groups[,1] != 0),]
   
   group_info <- c()
   
