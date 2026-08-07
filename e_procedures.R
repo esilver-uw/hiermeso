@@ -7,8 +7,8 @@
 # OUTPUT: 
 # p_value: the p_value associated with the group-wise null hypothesis that A.1 and A.2 are generated from the same parameter matrix.
 p_value <- function(d_bar, m) {
-  z_stat <- abs(d_bar * sqrt(m) / (sqrt(2) * SIGMA))
-  p_value <- pnorm(z_stat, lower.tail = F)
+  d_bar <- abs(d_bar)
+  p_value <- 2*pnorm(d_bar, sd = (sqrt(2) * SIGMA / sqrt(m)), lower.tail = F)
   
   return(p_value)
 }
