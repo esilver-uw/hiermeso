@@ -113,9 +113,25 @@ res_fitter <- function(selex_arrays, comp_idx = 3) {
 fdr_fitter <- function(selex_arrays, fd_arrays) {
   # Per iteration, if it makes a rejection, make it 1, if it doesn't, make it 0
   fdr_mat <- apply(fd_arrays, c(1,2), sum)/apply(selex_arrays, c(1,2), sum)
-  fdr_vec <- apply(fdr_mat, 1, sum)/200
-  fdr_vec[is.nan(fdr_vec)] <- 0
+  fdr_mat[is.nan(fdr_mat)] <- 0
+  fdr_vec <- apply(fdr_mat, 1, sum)/dim(selex_arrays)[2]
   return(fdr_vec)
+}
+
+# Fitter function for coverage rate plot.
+
+# Get vector of edges in each high-resolution subgroup. Get vector of edges for all rejected hypotheses. 
+# For each high resolution subgroup, 1 if it's completely contained in that vector, 0 if there's any point left out.
+cvg_fitter <- function(selex_arrays, p_group) {
+  res_grp <- GROUPS[[4]][GROUPS[[4]]$res_Group == p_group, 1:2]
+  p_edges <- which(GROUPS[[1]][,res_grp[2]] == res_grp[1])
+  cvg_mat <- data.frame(nrow = dim(selex_arrays)[2], ncol = dim(selex_arrays)[3])
+  for (i in 1:dim(selex_arrays)[2]) {
+    for (j in 1:dim(selex_arrays)[3]) {
+      # The architecture on this one is complex. Consider a helper function.
+      GROUPS[[1]][selex_arrays[p_group, i, j,] * dimnames(selex_arrays)[4]]
+    }
+  }
 }
 
 # THE PLOTS
@@ -192,9 +208,9 @@ detex_plot(viz_sa_3, "Resolution 3 Detections")
 detex_plot(viz_sa_3, "Resolution 3 Detections", c("p_value", "lr_mean_1", "cal_kappa_1", "lr_prior_2", "cal_mix"))
 
 # False detex
-fdr_mat_1 <- fdr_fitter(fd_array_1)
-fdr_mat_2 <- fdr_fitter(fd_array_2)
-fdr_mat_3 <- fdr_fitter(fd_array_3)
+fdr_mat_1 <- fdr_fitter(selex_array_1, fd_array_1)
+fdr_mat_2 <- fdr_fitter(selex_array_2, fd_array_2)
+fdr_mat_3 <- fdr_fitter(selex_array_3, fd_array_3)
 
 fdr_tbl <- rbind(fdr_mat_1, fdr_mat_2, fdr_mat_3)
 rownames <- c("P. Res. 1", "P. Res. 2", "P. Res. 3")
