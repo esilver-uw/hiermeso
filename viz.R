@@ -115,7 +115,66 @@ fdr_fitter <- function(selex_arrays, fd_arrays) {
   fdr_mat <- apply(fd_arrays, c(1,2), sum)/apply(selex_arrays, c(1,2), sum)
   fdr_vec <- apply(fdr_mat, 1, sum)/200
   fdr_vec[is.nan(fdr_vec)] <- 0
+  fdr_mat[is.nan(fdr_mat)] <- 0
+  fdr_vec <- apply(fdr_mat, 1, sum)/dim(selex_arrays)[2]
   return(fdr_vec)
+}
+
+# Fitter function for coverage rate plot. 
+# INPUT: 
+# l_group: the group that may be inside the others. Intended to be highest-resolution.
+# r_groups: vector of groups that may contain the others.
+# OUTPUT: 
+# contains: 1 if contained or 0
+group_containment <- function(l_group, r_groups) {
+  contains <- 0
+  
+  for (group in r_groups) {
+    if (l_group %in% GROUPS[[2]][[group]]) {
+      contains <- 1
+    }
+  }
+  
+  return(contains)
+}
+
+# Get vector of edges in each high-resolution subgroup. Get vector of edges for all rejected hypotheses. 
+# For each high resolution subgroup, 1 if it's completely contained in that vector, 0 if there's any point left out.
+cvg_fitter <- function(selex_arrays, p_group) {
+  # Get resolution-1 subgroups of p_group
+  p_subgroups <- GROUPS[[2]][[p_group]]
+  res_1_groups <- GROUPS[[4]][GROUPS[[4]]$Resolution == 1,4]
+  p_res_1_subgroups <- intersect(p_subgroups, res_1_groups)
+  
+  # Method and signal size.
+  cvg_mat <- matrix(nrow = dim(selex_arrays)[1], ncol = dim(selex_arrays)[3])
+  dimnames(cvg_mat) <- list(dimnames(selex_arrays)[[1]], dimnames(selex_arrays)[[3]])
+  
+  for (i in 1:dim(selex_arrays)[1]) {
+    for (k in 1:dim(selex_arrays)[3]) {
+      # We produce the running count over these indices
+      running_rate <- NA
+      for (j in 1:dim(selex_arrays)[2]) {
+        ct <- 0
+        selex_vec <- selex_arrays[i,j,k,]
+        detex_groups <- names(selex_vec[selex_vec == 1])
+        
+        for (g in p_res_1_subgroups) {
+          ct <- ct + group_containment(g, detex_groups)
+        }
+        ct <- ct/length(p_res_1_subgroups)
+        if (ct > 0) {
+          running_rate <- mean(c(running_rate, ct), na.rm = T)
+        }
+      }
+      if (is.na(running_rate)) {
+        running_rate <- 0
+      }
+      cvg_mat[i,k] <- running_rate
+    }
+  }
+  
+  return(cvg_mat)
 }
 
 # THE PLOTS
@@ -194,14 +253,14 @@ detex_plot(viz_sa_3, "Resolution 3 Detections")
 detex_plot(viz_sa_3, "Resolution 3 Detections", c("p_value", "lr_mean_1", "cal_kappa_1", "lr_prior_2", "cal_mix"))
 
 # False detex
-fdr_mat_1 <- fdr_fitter(fd_array_1)
-fdr_mat_2 <- fdr_fitter(fd_array_2)
-fdr_mat_3 <- fdr_fitter(fd_array_3)
+fdr_mat_1 <- fdr_fitter(selex_array_1, fd_array_1)
+fdr_mat_2 <- fdr_fitter(selex_array_2, fd_array_2)
+fdr_mat_3 <- fdr_fitter(selex_array_3, fd_array_3)
 
-fdr_tbl <- rbind(fdr_mat_1, fdr_mat_2, fdr_mat_3)
+fdr_tbl <- rbind(as.numeric(fdr_mat_1), as.numeric(fdr_mat_2), as.numeric(fdr_mat_3))
 rownames <- c("P. Res. 1", "P. Res. 2", "P. Res. 3")
 fdr_tbl <- data.frame(cbind(rownames, fdr_tbl))
-gt(fdr_tbl) |> fmt_number(decimals = 6) |> gt_split(col_slice_at = 6)
+gt(fdr_tbl) |> fmt_number(decimals = 6)
 
 # Get true detections for methods.
 
@@ -235,9 +294,33 @@ res_mat_8_1 <- res_fitter(td_mthd_8, 1)
 res_mat_9_1 <- res_fitter(td_mthd_9, 1)
 res_mat_10_1 <- res_fitter(td_mthd_10, 1)
 
-res_plot(res_mat_2_1, "Res 2 at Res 1")
-res_plot(res_mat_2_2, "Res 2 at Res 2")
-res_plot(res_mat_2_3, "Res 2 at Res 3")
+res_plot(res_mat_2_1, "Calibrator, k = 0.25, at Res 1")
+res_plot(res_mat_2_2, "Calibrator, k = 0.25, at Res 2")
+res_plot(res_mat_2_3, "Calibrator, k = 0.25, at Res 3")
+
+res_plot(res_mat_5_1, "Calibrator, mixture, at Res 1")
+res_plot(res_mat_5_2, "Calibrator, mixture, at Res 2")
+res_plot(res_mat_5_3, "Calibrator, mixture, at Res 3")
+
+res_plot(res_mat_6_1, "Likelihood Ratio, mean = 2.5, at Res 1")
+res_plot(res_mat_6_2, "Likelihood Ratio, mean = 2.5, at Res 2")
+res_plot(res_mat_6_3, "Likelihood Ratio, mean = 2.5, at Res 3")
+
+res_plot(res_mat_7_1, "Likelihood Ratio, mean = 5, at Res 1")
+res_plot(res_mat_7_2, "Likelihood Ratio, mean = 5, at Res 2")
+res_plot(res_mat_7_3, "Likelihood Ratio, mean = 5, at Res 3")
+
+res_plot(res_mat_8_1, "Likelihood Ratio, mean = 7.5, at Res 1")
+res_plot(res_mat_8_2, "Likelihood Ratio, mean = 7.5, at Res 2")
+res_plot(res_mat_8_3, "Likelihood Ratio, mean = 7.5, at Res 3")
+
+res_plot(res_mat_9_1, "LR Mixture, prior sigma = 5, at Res 1")
+res_plot(res_mat_9_2, "LR Mixture, prior sigma = 5, at Res 2")
+res_plot(res_mat_9_3, "LR Mixture, prior sigma = 5, at Res 3")
+
+res_plot(res_mat_10_1, "LR Mixture, prior sigma = 20, at Res 1")
+res_plot(res_mat_10_2, "LR Mixture, prior sigma = 20, at Res 2")
+res_plot(res_mat_10_3, "LR Mixture, prior sigma = 20, at Res 3")
 
 viz_ma_2 <- viz_fitter(method_array_2)
 viz_ma_5 <- viz_fitter(method_array_5)
