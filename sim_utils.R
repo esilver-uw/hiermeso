@@ -31,6 +31,7 @@ for (i in 1:N.SIZE) {
 }
 THETA[lower.tri(THETA)] = t(THETA)[lower.tri(THETA)]
 
+# TODO: needs new group architecture
 # Create 4D simulation array, indexed by perturbation group, tested group, signal size, and method.
 # INPUT: 
 # p_groups: vector of groups to perturb. Default: all.
@@ -61,11 +62,10 @@ array_step <- function(p_groups = GROUPS[[4]]$res_Group) {
         k <- k + 1
         
         # Get vector of edges in the group then yield node pairs.
-        res_grp <- data.frame(GROUPS[[4]][GROUPS[[4]]$res_Group == t_group,1:2])
-        edges <- which(GROUPS[[1]][,res_grp$Resolution] == res_grp$Group_Number)
+        edges <- GROUPS[[3]][[t_group]]
         
         # This can happen once per group.
-        m <- length(edges) * dim(A1)[3]
+        m <- length(edges) * N
         
         A2_bar <- mean(A1_sm[edges])
         A1_bar <- mean(A2_sm[edges])
@@ -125,13 +125,13 @@ batchable_array <- function(ct, p_groups = GROUPS[[4]]$res_Group) {
 # t_groups: groups to consider.
 # OUTPUT: 
 # selex_array: an array of test group selections by iteration and size.
-test_step <- function(sims_array, p_group_num, method_idx, alpha, t_groups = GROUPS) {
-  selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], dim(t_groups[[4]])[1]))
-  dimnames(selex_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups$res_Groups)
+test_step <- function(sims_array, p_group_num, method_idx, alpha, t_groups = GROUPS[[4]]$res_Group) {
+  selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], length(t_groups)))
+  dimnames(selex_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups)
   
   for (i in 1:dim(sims_array)[1]) {
     for (j in 1:dim(sims_array)[4]) {
-      e_vals <- sims_array[i,p_group_num,1:dim(t_groups[[4]])[1],j,method_idx]
+      e_vals <- sims_array[i,p_group_num,1:length(t_groups),j,method_idx]
       selex_array[i,j,] <- elp(e_vals, t_groups, alpha)
     }
   }
@@ -147,21 +147,29 @@ test_step <- function(sims_array, p_group_num, method_idx, alpha, t_groups = GRO
 # t_groups: groups to consider.
 # OUTPUT: 
 # selex_array: an array of test group selections by iteration and size.
-p_value_test <- function(sims_array, p_group_num, alpha, mode = 1, t_groups = GROUPS) {
-  t_groups_res_grp <- GROUPS[[4]]$res_Group[GROUPS[[4]]$Resolution == 1]
-  selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], length(t_groups_res_grp)))
-  dimnames(selex_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups_res_grp)
+p_value_test <- function(sims_array, p_group, alpha, mode = 1, t_groups <- GROUPS[[4]]$res_Group) {
+  # Split t_groups into res 1 and res >1 
+  r1_groups <- intersect(GROUPS[[4]]$res_Group[GROUPS[[4]]$Resolution == 1], t_groups)
+  nr1_groups <- intersect(setdiff(GROUPS[[4]]$res_Group, r1_groups), t_groups)
+  
+  selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], length(r1_groups)))
+  dimnames(selex_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], r1_groups)
   
   for (i in 1:dim(sims_array)[1]) {
     for (j in 1:dim(sims_array)[4]) {
-      p_vals <- sims_array[i,p_group_num,1:length(t_groups_res_grp),j,1]
+      p_vals <- sims_array[i,p_group,1:length(r1_groups),j,1]
       selex_array[i,j,] <- as.integer(p.adjust(p_vals, method = "BH") <= alpha)
     }
   }
   
-  return(selex_array)
+  # Array to conform p_value array to the rest.
+  dummy_array <- array(0, dim = c(dim(sims_array)[1], dim(sims_array)[4], length(nr1_groups)))
+  dimnames(dummy_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], nr1_groups)
+  
+  return(abind(selex_array, dummy_array))
 }
 
+# TODO: needs new group architecture
 # Filters to include only true selections.
 # INPUT:
 # selex_arrays: an array of test group selections by method or group, iteration and size.
@@ -217,17 +225,12 @@ filter_true_selex <- function(selex_arrays, p_group = -1, semi_true = F, false =
 # t_groups: groups to consider.
 # OUTPUT: 
 # selex_arrays: 4D array of test group selections by method, iteration, and size.
-omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS) {
-  p_group_num <- which(dimnames(sims_array)[[2]] == p_group)
+omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS[[4]]$res_Group) {
   
-  selex_arrays <- array(dim = c(11, dim(sims_array)[1], dim(sims_array)[4], dim(t_groups[[4]])[1]))
-  dimnames(selex_arrays) <- list(dimnames(sims_array)[[5]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups[[4]]$res_Group)
-  
-  # Array to conform p_value array to the rest.
-  dummy_array <- array(0, dim = c(dim(sims_array)[1], dim(sims_array)[4], length(t_groups[[4]]$res_Group[t_groups[[4]]$Resolution != 1])))
-  dimnames(dummy_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups[[4]]$res_Group[t_groups[[4]]$Resolution != 1])
+  selex_arrays <- array(dim = c(11, dim(sims_array)[1], dim(sims_array)[4], length(t_groups)))
+  dimnames(selex_arrays) <- list(dimnames(sims_array)[[5]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups)
 
-  selex_array <- abind(p_value_test(sims_array, p_group_num, alpha, mode, t_groups), dummy_array)
+  selex_array <- p_value_test(sims_array, p_group_num, alpha, mode, t_groups)
   
   selex_arrays[1,,,] <- selex_array
   
@@ -236,6 +239,7 @@ omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS
     
     selex_arrays[i,,,] <- selex_array
   }
+  
   return(selex_arrays)
 }
 
@@ -248,7 +252,7 @@ omnibus_test <- function(sims_array, p_group, alpha, mode = 1, t_groups = GROUPS
 # t_groups: groups to consider.
 # OUTPUT: 
 # selex_arrays: 4D array of test group selections by group, iteration, and size.
-omnires_test <- function(sims_array, method_idx, alpha, mode = 1, t_groups = GROUPS) {
+omnires_test <- function(sims_array, method_idx, alpha, mode = 1, t_groups = GROUPS[[4]]$res_Group) {
   selex_arrays <- array(dim = c(dim(sims_array)[2], dim(sims_array)[1], dim(sims_array)[4], dim(sims_array)[3]))
   dimnames(selex_arrays) <- list(dimnames(sims_array)[[2]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], dimnames(sims_array)[[3]])
   

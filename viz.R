@@ -151,6 +151,8 @@ res_plot <- function(viz_mat, title, pos = position_stack(reverse = T)) {
 
 # Load in data as from sim_arrays_job.R
 
+sims_array <- readRDS("outputs/sim_arrays_3_vm_2.RData")
+
 # You may note '_vm' appended to certain files. I carried out simulations using both
 # a computer cluster and my laptop.
 selex_array_1 <- readRDS("outputs/selex_array_1_vm_2.RData")

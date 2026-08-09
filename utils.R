@@ -16,9 +16,9 @@ Mode <- function(x) {
 # OUTPUT:
 # for L length of GROUP_SIZES
 # groups: data frame of dimension n^2 x L specifying group membership for each possible edge.
-# node_groups: data frame of dimension n x L specifying node-group membership for each node.
-# nodes_edge: data frame of dimension n^2 x 3 linking node pairs to edges.
-# group_info: data frame containing group, level, and group-level for each group.
+# group_subgroups: list of subgroups by group. (res_group notation)
+# group_memberships: list of edges by group. (res_group notation)
+# group_info: data frame containing group, level, and group-level for each group. (res_group notation)
 generate_groups <- function(group_sizes, n) {
   # number of levels
   L <- length(group_sizes)
@@ -34,6 +34,9 @@ generate_groups <- function(group_sizes, n) {
   # groups will be all combinations of node_groups. 
   upper_mask <- matrix(1:n^2, nrow = n)[upper.tri(matrix(1:n^2, nrow = n), T)]
   groups <- cbind(matrix(0, n^2, length(group_sizes)), expand.grid(1:n,1:n))
+  
+  # group memberships will be lists of nodes for each group and resolution, with same name as in group[[4]]
+  group_memberships <- list()
   for (l in 1:L) {
     g <- 0
     group_size <- group_sizes[l]
@@ -44,6 +47,9 @@ generate_groups <- function(group_sizes, n) {
         group <- intersect(matrix(1:n^2, nrow = n)[pairs], upper_mask)
         if (length(group)) {
           g <- g + 1
+          name <- paste0("res_",l,"_group_",g)
+          group_memberships[[name]] <- group
+          
           for (k in group) {
             groups[k,l] <- g
           }
@@ -79,9 +85,10 @@ generate_groups <- function(group_sizes, n) {
     group_subgroups[[g]] <- subgroups
   }
   
-  return(list(groups, group_subgroups, nodes_edge, group_info))
+  return(list(groups, group_subgroups, group_memberships, group_info))
 }
 
+# TODO: needs new group architecture
 # Returns observations from a given expected adjacency matrix.
 # INPUT:
 # theta: expected (mean) adjacency matrix
@@ -89,13 +96,9 @@ generate_groups <- function(group_sizes, n) {
 # OUTPUT: 
 # A: array of n observed adjacency matrices
 sample_network <- function(theta, n) {
-  A <- array(NA, c(nrow(theta), ncol(theta), n))
-  for (k in 1:n) {
-    for (i in 1:nrow(theta)) {
-      for (j in 1:ncol(theta)) {
-        A[i,j,k] = rnorm(1, theta[i,j], SIGMA)
-      }
-    }
+  A <- array(NA, dim = c(dim(theta)[1], dim(theta)[2], n))
+  for (i in 1:n) {
+    A[,,i] <-  matrix(rnorm(length(theta), theta, SIGMA), nrow = dim(theta)[1], ncol = dim(theta)[2])
   }
   return(A)
 }
@@ -110,12 +113,10 @@ sample_network <- function(theta, n) {
 # OUTPUT:
 # theta_prime: perturbed parameter adjacency matrix.
 perturb_expected_matrix <- function(theta, groups, g, size) {
-  # Get vector of edges in the group
-  res_grp <- data.frame(groups[[4]][groups[[4]]$res_Group == g,1:2])
-  edges <- which(groups[[1]][,res_grp$Resolution] == res_grp$Group_Number)
+  edges <- groups[[3]][[g]]
   
   # Apply perturbation
-  theta_prime <- theta
+  theta_prime <- theta[]
   theta_prime[edges] <- theta_prime[edges] + size
   return(theta_prime)
 }
@@ -142,14 +143,14 @@ create_lcm <- function(groups, n_base_level, n_groups) {
 # Run eLP: Largely adapted from Gablenz & Sabatti.
 # INPUT:
 # e_vals: vector of e_values by aligned with groups
-# groups: list of group attributes.
+# t_groups: vector of group names used.
 # alpha: alpha level of the test.
 # OUTPUT: 
 # detections: hypotheses rejected by the algorithm.
-elp <- function(e_vals, groups, alpha) {
+elp <- function(e_vals, t_groups, alpha) {
   # Get number of base level hypotheses and number of total hypotheses
-  n_base_level <- length(groups[[4]][groups[[4]]$Resolution == 1,2])
-  n_groups <- dim(groups[[4]])[1]
+  n_base_level <- length(intersect(GROUPS[[4]][GROUPS[[4]]$Resolution == 1,4], t_groups))
+  n_groups <- length(t_groups)
   
   x <- CVXR::Variable(n_groups, integer = TRUE)
   objective <- CVXR::Maximize(sum(x))
