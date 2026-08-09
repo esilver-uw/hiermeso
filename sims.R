@@ -1,7 +1,5 @@
 # Run simulations and save data.
 
-source("sim_utils.R")
-
 # Devise globals, including expected adjacency matrix
 SIGMA <- 25
 N.SIZE <- 64
@@ -9,7 +7,7 @@ N <- 20
 GROUP.SIZES <- c(4,8,16)
 # SIGNAL.SIZES <- 0:15
 SIGNAL.SIZES <- 0:15
-source("utils.R")
+source("sim_utils.R")
 source("e_procedures.R")
 
 GROUPS <- generate_groups(GROUP.SIZES, N.SIZE)
