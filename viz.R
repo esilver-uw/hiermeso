@@ -16,27 +16,27 @@ GROUPS <- generate_groups(GROUP.SIZES, N.SIZE)
 
 # Read in data from simulation and generate the plots for presentation
 
-sims_array <- readRDS("outputs/sim_arrays_3_vm_2.RData")
+sims_array <- readRDS("outputs/sim_arrays_3.RData")
 
 # You may note '_vm' appended to certain files. I carried out simulations using both
 # a computer cluster and my laptop.
-selex_array_1 <- readRDS("outputs/selex_array_1_vm_2.RData")
-selex_array_2 <- readRDS("outputs/selex_array_2_vm_2.RData")
-selex_array_3 <- readRDS("outputs/selex_array_3_vm_2.RData")
+selex_array_1 <- readRDS("outputs/selex_array_1.RData")
+selex_array_2 <- readRDS("outputs/selex_array_2.RData")
+selex_array_3 <- readRDS("outputs/selex_array_3.RData")
 
 # You may note '_vm' appended to certain files. I carried out simulations using both
 # a computer cluster and my laptop.
-method_array_2 <- readRDS("outputs/method_array_2_vm_2.RData")
-method_array_5 <- readRDS("outputs/method_array_5_vm_2.RData")
-method_array_6 <- readRDS("outputs/method_array_6_vm_2.RData")
-method_array_7 <- readRDS("outputs/method_array_7_vm_2.RData")
-method_array_8 <- readRDS("outputs/method_array_8_vm_2.RData")
-method_array_9 <- readRDS("outputs/method_array_9_vm_2.RData")
-method_array_10 <- readRDS("outputs/method_array_10_vm_2.RData")
+method_array_2 <- readRDS("outputs/method_array_2.RData")
+method_array_5 <- readRDS("outputs/method_array_5.RData")
+method_array_6 <- readRDS("outputs/method_array_6.RData")
+method_array_7 <- readRDS("outputs/method_array_7.RData")
+method_array_8 <- readRDS("outputs/method_array_8.RData")
+method_array_9 <- readRDS("outputs/method_array_9.RData")
+method_array_10 <- readRDS("outputs/method_array_10.RData")
 
-fdr_selex_array_1 <- readRDS("outputs/fdr_selex_array_1_vm_2.RData")
-fdr_selex_array_2 <- readRDS("outputs/fdr_selex_array_2_vm_2.RData")
-fdr_selex_array_3 <- readRDS("outputs/fdr_selex_array_3_vm_2.RData")
+fdr_selex_array_1 <- readRDS("outputs/fdr_selex_array_1.RData")
+fdr_selex_array_2 <- readRDS("outputs/fdr_selex_array_2.RData")
+fdr_selex_array_3 <- readRDS("outputs/fdr_selex_array_3.RData")
 
 # Get true/false detections.
 

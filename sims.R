@@ -23,21 +23,21 @@ for (i in 1:N.SIZE) {
 }
 THETA[lower.tri(THETA)] = t(THETA)[lower.tri(THETA)]
 
-saveRDS(THETA, file = "outputs/THETA_vm.RData")
+saveRDS(THETA, file = "outputs/THETA.RData")
 
 # Simulation Arrays
 sim_arrays <- batchable_array(200, c("res_1_group_2", "res_2_group_2", "res_3_group_2"))
 
-saveRDS(sim_arrays, file = "outputs/sim_arrays_vm.RData")
+saveRDS(sim_arrays, file = "outputs/sim_arrays.RData")
 
 # Selection Arrays
 selex_array_1 <- omnibus_test(sims_array, "res_1_group_2", 0.05, 2)
 selex_array_2 <- omnibus_test(sims_array, "res_2_group_2", 0.05, 2)
 selex_array_3 <- omnibus_test(sims_array, "res_3_group_2", 0.05, 2)
 
-saveRDS(selex_array_1, "outputs/selex_array_1_vm.RData")
-saveRDS(selex_array_2, "outputs/selex_array_2_vm.RData")
-saveRDS(selex_array_3, "outputs/selex_array_3_vm.RData")
+saveRDS(selex_array_1, "outputs/selex_array_1.RData")
+saveRDS(selex_array_2, "outputs/selex_array_2.RData")
+saveRDS(selex_array_3, "outputs/selex_array_3.RData")
 
 # Method Arrays (Pruned methods; not all are interesting.)
 method_array_2 <- omnires_test(sims_array, 2, 0.05, 2)
@@ -51,10 +51,10 @@ method_array_9 <- omnires_test(sims_array, 9, 0.05, 2)
 method_array_10 <- omnires_test(sims_array, 10, 0.05, 2)
 # method_array_11 <- omnires_test(sims_array, 11, 0.05, 2)
 
-saveRDS(method_array_2, "outputs/method_array_2_vm.RData")
-saveRDS(method_array_5, "outputs/method_array_5_vm.RData")
-saveRDS(method_array_6, "outputs/method_array_6_vm.RData")
-saveRDS(method_array_7, "outputs/method_array_7_vm.RData")
-saveRDS(method_array_8, "outputs/method_array_8_vm.RData")
-saveRDS(method_array_9, "outputs/method_array_9_vm.RData")
-saveRDS(method_array_10, "outputs/method_array_10_vm.RData")
+saveRDS(method_array_2, "outputs/method_array_2.RData")
+saveRDS(method_array_5, "outputs/method_array_5.RData")
+saveRDS(method_array_6, "outputs/method_array_6.RData")
+saveRDS(method_array_7, "outputs/method_array_7.RData")
+saveRDS(method_array_8, "outputs/method_array_8.RData")
+saveRDS(method_array_9, "outputs/method_array_9.RData")
+saveRDS(method_array_10, "outputs/method_array_10.RData")
