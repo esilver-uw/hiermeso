@@ -1,6 +1,6 @@
 # Run simulations and save data.
 
-source("sim_utils.R")
+source("viz_utils.R")
 
 # Devise globals, including expected adjacency matrix
 SIGMA <- 25
@@ -143,3 +143,6 @@ res_plot(viz_ma_7, "Likelihood Ratio, mean = 5", position_identity())
 res_plot(viz_ma_8, "Likelihood Ratio, mean = 7.5", position_identity())
 res_plot(viz_ma_9, "LR Mixture, prior sigma = 5", position_identity())
 res_plot(viz_ma_10, "LR Mixture, prior sigma = 20", position_identity())
+
+cvg_ma_3 <- cvg_fitter(td_array_3, "res_3_group_2")
+cvg_plot(cvg_ma_3, "Coverage Proportion by Signal Size at Resolution 3", method = c("p_value", "cal_mix", "lr_prior_1", "lr_mean_1", "lr_mean_2", "lr_mean_3", "lr_prior_2"))

@@ -220,7 +220,15 @@ cvg_fitter <- function(selex_arrays, p_group) {
     }
   }
   
-  return(cvg_mat)
+  cvg_fit <- data.frame()
+  
+  for (i in 1:dim(cvg_mat)[2]) {
+    cvg_fit <- rbind(cvg_fit, cbind(as.numeric(cvg_mat[,i]), rep(dimnames(cvg_mat)[[2]][i], dim(cvg_mat)[1]), dimnames(cvg_mat)[[1]]))
+  }
+  
+  colnames(cvg_fit) <- c("Cvg", "Size", "Comp")
+  
+  return(cvg_fit)
 }
 
 # THE PLOTS
@@ -238,6 +246,18 @@ detex_plot <- function(viz_mat, title, methods = c("p_value", "cal_kappa_1", "ca
     xlab(label = "Signal Size") + ylab(label = "Proportion of Rejections") +
     scale_colour_discrete(name = "Procedure") +
     scale_x_discrete(limits = as.factor(unique(viz_mat$Size))) +
+    labs(title = title)
+}
+
+# Plot n procedures
+cvg_plot <- function(viz_mat, title, methods = c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_mean_1", "lr_mean_2", "lr_mean_3", "lr_prior_1", "lr_prior_2", "lr_prior_3")) {
+  viz_mat <- viz_mat[viz_mat$Comp %in% methods,]
+  ggplot() +
+    geom_path(mapping = aes(x = as.factor(viz_mat$Size), y = as.numeric(viz_mat$Cvg), colour = viz_mat$Comp, group = viz_mat$Comp)) +
+    xlab(label = "Signal Size") + ylab(label = "Coverage Proportion") +
+    scale_colour_discrete(name = "Procedure") +
+    scale_x_discrete(limits = as.factor(unique(viz_mat$Size))) +
+    scale_y_continuous(limits = c(0,1)) + 
     labs(title = title)
 }
 

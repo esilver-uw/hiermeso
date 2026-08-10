@@ -160,7 +160,7 @@ elp <- function(e_vals, t_groups, alpha) {
   x <- CVXR::Variable(n_groups, integer = TRUE)
   objective <- CVXR::Maximize(sum(x))
   
-  location_constraint_matrix <- create_lcm(groups, n_base_level, n_groups)
+  location_constraint_matrix <- create_lcm(GROUPS, n_base_level, n_groups)
   
   b <- rep(1, n_base_level)
   constraints <- list(x >= 0,
@@ -195,7 +195,7 @@ trunc <- function(K, x) {
 # sim_array: a single iteration simulation array.
 array_step <- function(p_groups = GROUPS[[4]]$res_Group, t_groups = GROUPS[[4]]$res_Group) {
   sim_array <- array(dim = c(length(p_groups), length(t_groups), length(SIGNAL.SIZES), 11))
-  dimnames(sim_array) <- list(p_groups, t_group, SIGNAL.SIZES,
+  dimnames(sim_array) <- list(p_groups, t_groups, SIGNAL.SIZES,
                               c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_mean_1", "lr_mean_2", "lr_mean_3", "lr_prior_1", "lr_prior_2", "lr_prior_3")) 
   A1 <- sample_network(THETA, N)
   # A1 Sample-wise Mean
@@ -260,34 +260,34 @@ array_step <- function(p_groups = GROUPS[[4]]$res_Group, t_groups = GROUPS[[4]]$
 # ct: number of arrays to create.
 # p_groups: vector of groups to perturb. Default: all.
 # OUTPUT:
-# sims_array: 5D array with first index iteration, then perturbation group, tested group, signal size, and method.
+# sim_arrays: 5D array with first index iteration, then perturbation group, tested group, signal size, and method.
 batchable_array <- function(ct, p_groups = GROUPS[[4]]$res_Group) {
-  sims_array <- array(dim = c(ct, length(p_groups), dim(GROUPS[[4]])[1], length(SIGNAL.SIZES), 11))
+  sim_arrays <- array(dim = c(ct, length(p_groups), dim(GROUPS[[4]])[1], length(SIGNAL.SIZES), 11))
   for (i in 1:ct) {
-    sims_array[i,,,,] <- array_step(p_groups) 
+    sim_arrays[i,,,,] <- array_step(p_groups) 
   }
   
-  dimnames(sims_array) <- list(1:ct, p_groups, GROUPS[[4]]$res_Group, SIGNAL.SIZES,
+  dimnames(sim_arrays) <- list(1:ct, p_groups, GROUPS[[4]]$res_Group, SIGNAL.SIZES,
                                c("p_value", "cal_kappa_1", "cal_kappa_2", "cal_kappa_3", "cal_mix", "lr_mean_1", "lr_mean_2", "lr_mean_3", "lr_prior_1", "lr_prior_2", "lr_prior_3"))
-  return(sims_array)
+  return(sim_arrays)
 }
 
 # Performs e-value testing on multiple iterations on a simulation array at a perturbation group and method combination.
 # INPUT: 
-# sims_array: a multiple-iteration simulation array.
+# sim_arrays: a multiple-iteration simulation array.
 # p_group: a single perturbation group index to consider.
 # method_idx: a method to consider.
 # alpha: alpha level.
 # t_groups: groups to consider.
 # OUTPUT: 
 # selex_array: an array of test group selections by iteration and size.
-test_step <- function(sims_array, p_group_num, method_idx, alpha, t_groups = GROUPS[[4]]$res_Group) {
-  selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], length(t_groups)))
-  dimnames(selex_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups)
+test_step <- function(sim_arrays, p_group_num, method_idx, alpha, t_groups = GROUPS[[4]]$res_Group) {
+  selex_array <- array(dim = c(dim(sim_arrays)[1], dim(sim_arrays)[4], length(t_groups)))
+  dimnames(selex_array) <- list(dimnames(sim_arrays)[[1]], dimnames(sim_arrays)[[4]], t_groups)
   
-  for (i in 1:dim(sims_array)[1]) {
-    for (j in 1:dim(sims_array)[4]) {
-      e_vals <- sims_array[i,p_group_num,1:length(t_groups),j,method_idx]
+  for (i in 1:dim(sim_arrays)[1]) {
+    for (j in 1:dim(sim_arrays)[4]) {
+      e_vals <- sim_arrays[i,p_group_num,1:length(t_groups),j,method_idx]
       selex_array[i,j,] <- elp(e_vals, t_groups, alpha)
     }
   }
@@ -297,53 +297,53 @@ test_step <- function(sims_array, p_group_num, method_idx, alpha, t_groups = GRO
 
 # Performs p_value testing on multiple iterations on a simulation array at a perturbation group.
 # INPUT: 
-# sims_array: a multiple-iteration simulation array.
+# sim_arrays: a multiple-iteration simulation array.
 # p_group_num: a single perturbation group index to consider.
 # alpha: alpha level.
 # t_groups: groups to consider.
 # OUTPUT: 
 # selex_array: an array of test group selections by iteration and size.
-p_value_test <- function(sims_array, p_group, alpha, t_groups = GROUPS[[4]]$res_Group) {
+p_value_test <- function(sim_arrays, p_group, alpha, t_groups = GROUPS[[4]]$res_Group) {
   # Split t_groups into res 1 and res >1 
   r1_groups <- intersect(GROUPS[[4]]$res_Group[GROUPS[[4]]$Resolution == 1], t_groups)
   nr1_groups <- intersect(setdiff(GROUPS[[4]]$res_Group, r1_groups), t_groups)
   
-  selex_array <- array(dim = c(dim(sims_array)[1], dim(sims_array)[4], length(r1_groups)))
-  dimnames(selex_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], r1_groups)
+  selex_array <- array(dim = c(dim(sim_arrays)[1], dim(sim_arrays)[4], length(r1_groups)))
+  dimnames(selex_array) <- list(dimnames(sim_arrays)[[1]], dimnames(sim_arrays)[[4]], r1_groups)
   
-  for (i in 1:dim(sims_array)[1]) {
-    for (j in 1:dim(sims_array)[4]) {
-      p_vals <- sims_array[i,p_group,1:length(r1_groups),j,1]
+  for (i in 1:dim(sim_arrays)[1]) {
+    for (j in 1:dim(sim_arrays)[4]) {
+      p_vals <- sim_arrays[i,p_group,1:length(r1_groups),j,1]
       selex_array[i,j,] <- as.integer(p.adjust(p_vals, method = "BH") <= alpha)
     }
   }
   
   # Array to conform p_value array to the rest.
-  dummy_array <- array(0, dim = c(dim(sims_array)[1], dim(sims_array)[4], length(nr1_groups)))
-  dimnames(dummy_array) <- list(dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], nr1_groups)
+  dummy_array <- array(0, dim = c(dim(sim_arrays)[1], dim(sim_arrays)[4], length(nr1_groups)))
+  dimnames(dummy_array) <- list(dimnames(sim_arrays)[[1]], dimnames(sim_arrays)[[4]], nr1_groups)
   
   return(abind(selex_array, dummy_array))
 }
 
 # Performs e-value testing on multiple iterations on a simulation array on a single perturbation group on all methods.
 # INPUT: 
-# sims_array: a multiple-iteration simulation array.
+# sim_arrays: a multiple-iteration simulation array.
 # p_group: a single perturbation group to consider.
 # alpha: alpha level.
 # t_groups: groups to consider.
 # OUTPUT: 
 # selex_arrays: 4D array of test group selections by method, iteration, and size.
-omnibus_test <- function(sims_array, p_group, alpha, t_groups = GROUPS[[4]]$res_Group) {
+omnibus_test <- function(sim_arrays, p_group, alpha, t_groups = GROUPS[[4]]$res_Group) {
   
-  selex_arrays <- array(dim = c(11, dim(sims_array)[1], dim(sims_array)[4], length(t_groups)))
-  dimnames(selex_arrays) <- list(dimnames(sims_array)[[5]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], t_groups)
+  selex_arrays <- array(dim = c(11, dim(sim_arrays)[1], dim(sim_arrays)[4], length(t_groups)))
+  dimnames(selex_arrays) <- list(dimnames(sim_arrays)[[5]], dimnames(sim_arrays)[[1]], dimnames(sim_arrays)[[4]], t_groups)
   
-  selex_array <- p_value_test(sims_array, p_group_num, alpha, t_groups)
+  selex_array <- p_value_test(sim_arrays, p_group, alpha, t_groups)
   
   selex_arrays[1,,,] <- selex_array
   
-  for (i in 2:(dim(sims_array)[5])) {
-    selex_array <- test_step(sims_array, p_group_num, i, alpha, t_groups)
+  for (i in 2:(dim(sim_arrays)[5])) {
+    selex_array <- test_step(sim_arrays, p_group, i, alpha, t_groups)
     
     selex_arrays[i,,,] <- selex_array
   }
@@ -353,19 +353,19 @@ omnibus_test <- function(sims_array, p_group, alpha, t_groups = GROUPS[[4]]$res_
 
 # Performs e-value testing on multiple iterations on a simulation array across perturbation groups on a single method.
 # INPUT: 
-# sims_array: a multiple-iteration simulation array.
+# sim_arrays: a multiple-iteration simulation array.
 # method_idx: method to consider.
 # alpha: alpha level.
 # t_groups: groups to consider.
 # OUTPUT: 
 # selex_arrays: 4D array of test group selections by group, iteration, and size.
-omnires_test <- function(sims_array, method_idx, alpha, t_groups = GROUPS[[4]]$res_Group) {
-  selex_arrays <- array(dim = c(dim(sims_array)[2], dim(sims_array)[1], dim(sims_array)[4], dim(sims_array)[3]))
-  dimnames(selex_arrays) <- list(dimnames(sims_array)[[2]], dimnames(sims_array)[[1]], dimnames(sims_array)[[4]], dimnames(sims_array)[[3]])
+omnires_test <- function(sim_arrays, method_idx, alpha, t_groups = GROUPS[[4]]$res_Group) {
+  selex_arrays <- array(dim = c(dim(sim_arrays)[2], dim(sim_arrays)[1], dim(sim_arrays)[4], dim(sim_arrays)[3]))
+  dimnames(selex_arrays) <- list(dimnames(sim_arrays)[[2]], dimnames(sim_arrays)[[1]], dimnames(sim_arrays)[[4]], dimnames(sim_arrays)[[3]])
   
-  for (i in 1:(dim(sims_array)[2])) {
-    selex_array <- test_step(sims_array, i, method_idx, alpha, t_groups)
-    p_group <- dimnames(sims_array)[[2]][i]
+  for (i in 1:(dim(sim_arrays)[2])) {
+    selex_array <- test_step(sim_arrays, i, method_idx, alpha, t_groups)
+    p_group <- dimnames(sim_arrays)[[2]][i]
     
     selex_arrays[i,,,] <- selex_array
   }
