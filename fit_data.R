@@ -48,33 +48,81 @@ for (i in 1:116) {
   node_groups[i,4] <- i
 }
 
-# Get edge groups
+# Get node groups (set topology)
 
-nodes_to_edges <- matrix(1:116^2, nrow = 116, ncol = 116)
-groups_to_edges <- array(NA, dim = c(116, 116, 4))
-groups <- matrix(NA, nrow = 116^2, 4)
-for (idx in 1:116^2) {
-  i <- which(nodes_to_edges == idx, arr.ind = TRUE)[1]
-  j <- which(nodes_to_edges == idx, arr.ind = TRUE)[2]
-  if (i <= j) {
-    groups_ij <- data.frame(i = c(node_groups[i,1], node_groups[i,2], node_groups[i,3], node_groups[i,4]), 
-                            j = c(node_groups[j,1], node_groups[j,2], node_groups[j,3], node_groups[j,4]))
-    groups_to_edges[i,j,] <- paste(groups_ij[,1], groups_ij[,2], sep = "")
+node_groups <- list()
+
+# Level 1
+node_groups[[1]] <- list()
+for (lab in unique(labs[,6])[[1]]) {
+  node_groups[[1]][[lab]] <- which(labs[,6] == lab)
+}
+
+# Level 2
+node_groups[[2]] <- list()
+for (lab in unique(labs[,5])[[1]]) {
+  node_groups[[2]][[lab]] <- which(labs[,5] == lab)
+}
+
+# Level 3
+node_groups[[3]] <- list()
+for (lab1 in unique(labs[,6])[[1]]) {
+  for (lab2 in unique(labs[,5])[[1]]) {
+    node_groups[[3]][[paste0(lab2, ".", lab1, sep = "")]] <- which(labs[,6] == lab1 & labs[,5] == lab2)
   }
 }
 
-# Construct group info
+node_groups[[4]] <- list()
+for (i in 1:116) {
+  node_groups[[4]][[labs[i,1][[1]]]] <- i
+}
 
-group_info_mat <- array(NA, dim = c(116, 116, 4))
-groups_ct <- length(unique(na.omit(as.vector(groups_to_edges[,,4]))))
-group_info <- matrix(NA, nrow = groups_ct, ncol = 4)
-for (l in 1:4) {
-  group_ns <- unique(na.omit(as.vector(groups_to_edges[,,l])))
-  group_info[,l] <- append(1:length(group_ns), rep(NA, groups_ct - length(group_ns)))
-  for (i in 1:116) {
-    for (j in i:116) {
-      group_info_mat[i,j,l] <- which(group_ns == groups_to_edges[i,j,l])
+# Get edge groups (cartesian product topology) --> plan a function.
+# yield the following.
+# Group names: res_(l)_group_(g1-by-g2)
+# groups: data frame of dimension n^2 x L specifying group membership for each possible edge.
+# group_overlaps: list of overlaps by group. (res_group notation)
+# group_memberships: list of edges by group. (res_group notation)
+# group_info: data frame containing group, level, and group-level for each group. (res_group notation)
+
+# Remove lower triangle; these will be empty edges.
+ref_mat <- matrix(1:116^2, nrow = 116, ncol = 116)
+ref_mat[!upper.tri(ref_mat)] <- NA
+
+groups <- matrix(NA, nrow = 116^2, ncol = 4)
+for (idx in 1:116^2) {
+  cds <- which(ref_mat == idx, arr.ind = TRUE)
+  if (length(cds) > 0) {
+    i <- cds[1]
+    j <- cds[2]
+    for (l in 1:4) {
+      il <- names(which(sapply(node_groups[[l]], function(y) i %in% y)))
+      jl <- names(which(sapply(node_groups[[l]], function(y) j %in% y)))
+      
+      group <- sort(c(il, jl))
+      
+      groups[idx,l] <- paste0(group[1], "-", group[2], sep = "")
     }
   }
 }
+
+group_info <- c()
+
+for (l in 1:4) {
+  df_temp <- data.frame("Group_Number" = unique(na.omit(groups[,l])))
+  df_temp$Resolution <- l
+  df_temp$group <- paste0("group_", df_temp$Group_Number)
+  df_temp$res_Group <- paste0("res_",df_temp$Resolution, "_", df_temp$group)
+  
+  group_info <- rbind(group_info, df_temp)
+}
+
+groups_trimmed <- groups[complete.cases(groups),]
+
+# Somewhat extensive in terms of search space, but simplified by a few rules:
+# 1. Each resolution forms a partition
+# 2. Each combination of (L,R) x (L,R) overlaps with each combination of lobe x lobe (verify this fact)
+# 3. In terms of (L,R) x lobe groups, an overlap occurs with 2 same (L,R) or 2 same lobe labels.
+# 4. Each region accords to a particular (L,R) and lobe, and thus will overlap with 2 same (L,R) or 2 same lobe labels.
+# Again, verify this, but I think this schema should work.
 
