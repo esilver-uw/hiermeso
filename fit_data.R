@@ -90,6 +90,7 @@ ref_mat <- matrix(1:116^2, nrow = 116, ncol = 116)
 ref_mat[!upper.tri(ref_mat)] <- NA
 
 groups <- matrix(NA, nrow = 116^2, ncol = 4)
+eg_to_ng <- list()
 for (idx in 1:116^2) {
   cds <- which(ref_mat == idx, arr.ind = TRUE)
   if (length(cds) > 0) {
@@ -100,8 +101,13 @@ for (idx in 1:116^2) {
       jl <- names(which(sapply(node_groups[[l]], function(y) j %in% y)))
       
       group <- sort(c(il, jl))
+      group_lab <- paste0(group[1], "-", group[2], sep = "")
       
-      groups[idx,l] <- paste0(group[1], "-", group[2], sep = "")
+      groups[idx,l] <- group_lab
+      
+      if (is.null(eg_to_ng[[group_lab]])) {
+        eg_to_ng[[group_lab]] <- group
+      }
     }
   }
 }
@@ -109,20 +115,57 @@ for (idx in 1:116^2) {
 group_info <- c()
 
 for (l in 1:4) {
-  df_temp <- data.frame("Group_Number" = unique(na.omit(groups[,l])))
+  df_temp <- data.frame("Group_Lab" = unique(na.omit(groups[,l])))
   df_temp$Resolution <- l
-  df_temp$group <- paste0("group_", df_temp$Group_Number)
+  df_temp$group <- paste0("group_", df_temp$Group_Lab)
   df_temp$res_Group <- paste0("res_",df_temp$Resolution, "_", df_temp$group)
   
   group_info <- rbind(group_info, df_temp)
 }
 
-groups_trimmed <- groups[complete.cases(groups),]
+# This one takes a while. But you only have to run it once.
 
-# Somewhat extensive in terms of search space, but simplified by a few rules:
-# 1. Each resolution forms a partition
-# 2. Each combination of (L,R) x (L,R) overlaps with each combination of lobe x lobe (verify this fact)
-# 3. In terms of (L,R) x lobe groups, an overlap occurs with 2 same (L,R) or 2 same lobe labels.
-# 4. Each region accords to a particular (L,R) and lobe, and thus will overlap with 2 same (L,R) or 2 same lobe labels.
-# Again, verify this, but I think this schema should work.
+group_overlaps <- list()
+
+# Iterate over groups s_group for selected and look at other groups at lower resolutions
+for (i in 1:nrow(group_info)) {
+  s_inf <- group_info[i,]
+  
+  s_group <- s_inf[1][[1]]
+  s_group_1 <- eg_to_ng[[s_group]][1]
+  s_group_2 <- eg_to_ng[[s_group]][2]
+  
+  s_res <- s_inf[2][[1]]
+  
+  s_nodes_1 <- node_groups[[s_res]][[s_group_1]]
+  s_nodes_2 <- node_groups[[s_res]][[s_group_2]]
+  
+  # For each group of lower resolution c_group for comparator, s_group_1 s_group_2 p_group_1 p_group_2, get node groups
+  p_infs <- group_info[group_info$Resolution > s_res,]
+  s_overlaps <- s_group
+  
+  if (dim(p_infs)[1] > 0) {
+    for (j in 1:nrow(p_infs)) {
+      p_inf <- p_infs[j,]
+      
+      p_group <- p_inf[1][[1]]
+      p_group_1 <- eg_to_ng[[p_group]][1]
+      p_group_2 <- eg_to_ng[[p_group]][2]
+      
+      p_res <- p_inf[2][[1]]
+      
+      p_nodes_1 <- node_groups[[p_res]][[p_group_1]]
+      p_nodes_2 <- node_groups[[p_res]][[p_group_2]]
+      
+      # Add p_group to group_overlaps$s_group
+      # If node group on s_group_1 and p_group_1 have nonzero overlap AND same on s_group_2 and p_group_2 have nonzero overlap
+      if (length(intersect(p_nodes_1, s_nodes_1)) * length(intersect(p_nodes_2, s_nodes_2)) > 0 | 
+          length(intersect(p_nodes_1, s_nodes_2)) * length(intersect(p_nodes_2, s_nodes_1)) > 0) {
+        s_overlaps <- append(s_overlaps, p_group)
+      }
+    }
+  }
+  
+  group_overlaps[[s_group]] <- s_overlaps
+}
 
