@@ -79,84 +79,95 @@ for (i in 1:116) {
 
 # Get edge groups (cartesian product topology) --> plan a function.
 # yield the following.
-# Group names: res_(l)_group_(g1-by-g2)
+
+
+# Generate (edge) groups from node groups, with group names: res_(l)_group_(g1-by-g2)
+# INPUT:
+# L: number of resolutions
+# N: number of nodes
+# node_groups: 2D list mapping, for each resolution, nodes to each node group
+# OUTPUT: 
 # groups: data frame of dimension n^2 x L specifying group membership for each possible edge.
 # group_overlaps: list of overlaps by group. (res_group notation)
 # group_memberships: list of edges by group. (res_group notation)
 # group_info: data frame containing group, level, and group-level for each group. (res_group notation)
-
-# Remove lower triangle; these will be empty edges.
-ref_mat <- matrix(1:116^2, nrow = 116, ncol = 116)
-ref_mat[!upper.tri(ref_mat)] <- NA
-
-groups <- matrix(NA, nrow = 116^2, ncol = 4)
-group_memberships <- list()
-eg_to_ng <- list()
-for (idx in 1:116^2) {
-  cds <- which(ref_mat == idx, arr.ind = TRUE)
-  if (length(cds) > 0) {
-    i <- cds[1]
-    j <- cds[2]
-    for (l in 1:4) {
-      il <- names(which(sapply(node_groups[[l]], function(y) i %in% y)))
-      jl <- names(which(sapply(node_groups[[l]], function(y) j %in% y)))
-      
-      group <- sort(c(il, jl))
-      group_lab <- paste0(group[1], "-", group[2], sep = "")
-      
-      groups[idx,l] <- group_lab
-      group_memberships[[group_lab]] <- append(group_memberships[[group_lab]], idx)
-      
-      if (is.null(eg_to_ng[[group_lab]])) {
-        eg_to_ng[[group_lab]] <- group
-      }
-    }
-  }
-}
-
-group_info <- c()
-
-for (l in 1:4) {
-  df_temp <- data.frame("Group_Lab" = unique(na.omit(groups[,l])))
-  df_temp$Resolution <- l
-  df_temp$group <- paste0("group_", df_temp$Group_Lab)
-  df_temp$res_Group <- paste0("res_",df_temp$Resolution, "_", df_temp$group)
+# eg_to_ng: list mapping each (edge) group to its composite node groups.
+groups_from_ng <- function(L, N, node_groups) {
+  # Remove lower triangle; these will be empty edges.
+  ref_mat <- matrix(1:N^2, nrow = N, ncol = N)
+  ref_mat[!upper.tri(ref_mat)] <- NA
   
-  group_info <- rbind(group_info, df_temp)
-}
-
-# This one takes a while. But you only have to run it once.
-
-group_overlaps <- list()
-
-# Iterate over groups s_group for selected and look at other groups at lower resolutions
-for (i in 1:nrow(group_info)) {
-  s_inf <- group_info[i,]
-  
-  s_group <- s_inf[1][[1]]
-  
-  s_res <- s_inf[2][[1]]
-  
-  # For each group of lower resolution c_group for comparator, s_group_1 s_group_2 p_group_1 p_group_2, get node groups
-  p_infs <- group_info[group_info$Resolution > s_res,]
-  s_overlaps <- s_group
-  
-  if (dim(p_infs)[1] > 0) {
-    for (j in 1:nrow(p_infs)) {
-      p_inf <- p_infs[j,]
-      
-      p_group <- p_inf[1][[1]]
-      
-      p_res <- p_inf[2][[1]]
-      
-      # Add p_group to group_overlaps$s_group
-      # If node group on s_group_1 and p_group_1 have nonzero overlap AND same on s_group_2 and p_group_2 have nonzero overlap
-      if (length(intersect(group_memberships[[s_group]], group_memberships[[p_group]])) > 0) {
-        s_overlaps <- append(s_overlaps, p_group)
+  groups <- matrix(NA, nrow = N^2, ncol = L)
+  group_memberships <- list()
+  eg_to_ng <- list()
+  for (idx in 1:N^2) {
+    cds <- which(ref_mat == idx, arr.ind = TRUE)
+    if (length(cds) > 0) {
+      i <- cds[1]
+      j <- cds[2]
+      for (l in 1:L) {
+        il <- names(which(sapply(node_groups[[l]], function(y) i %in% y)))
+        jl <- names(which(sapply(node_groups[[l]], function(y) j %in% y)))
+        
+        group <- sort(c(il, jl))
+        group_lab <- paste0(group[1], "-", group[2], sep = "")
+        
+        groups[idx,l] <- group_lab
+        group_memberships[[group_lab]] <- append(group_memberships[[group_lab]], idx)
+        
+        if (is.null(eg_to_ng[[group_lab]])) {
+          eg_to_ng[[group_lab]] <- group
+        }
       }
     }
   }
   
-  group_overlaps[[s_group]] <- s_overlaps
+  group_info <- c()
+  
+  for (l in 1:L) {
+    df_temp <- data.frame("Group_Lab" = unique(na.omit(groups[,l])))
+    df_temp$Resolution <- l
+    df_temp$group <- paste0("group_", df_temp$Group_Lab)
+    df_temp$res_Group <- paste0("res_",df_temp$Resolution, "_", df_temp$group)
+    
+    group_info <- rbind(group_info, df_temp)
+  }
+  
+  # This one takes a while. But you only have to run it once.
+  
+  group_overlaps <- list()
+  
+  # Iterate over groups s_group for selected and look at other groups at lower resolutions
+  for (i in 1:nrow(group_info)) {
+    s_inf <- group_info[i,]
+    
+    s_group <- s_inf[1][[1]]
+    
+    s_res <- s_inf[2][[1]]
+    
+    # For each group of lower resolution c_group for comparator, s_group_1 s_group_2 p_group_1 p_group_2, get node groups
+    p_infs <- group_info[group_info$Resolution > s_res,]
+    s_overlaps <- s_group
+    
+    if (dim(p_infs)[1] > 0) {
+      for (j in 1:nrow(p_infs)) {
+        p_inf <- p_infs[j,]
+        
+        p_group <- p_inf[1][[1]]
+        
+        p_res <- p_inf[2][[1]]
+        
+        # Add p_group to group_overlaps$s_group
+        # If node group on s_group_1 and p_group_1 have nonzero overlap AND same on s_group_2 and p_group_2 have nonzero overlap
+        if (length(intersect(group_memberships[[s_group]], group_memberships[[p_group]])) > 0) {
+          s_overlaps <- append(s_overlaps, p_group)
+        }
+      }
+    }
+    
+    group_overlaps[[s_group]] <- s_overlaps
+  }
+  
+  return(list(groups, group_overlaps, group_memberships, group_info, eg_to_ng))
 }
 
