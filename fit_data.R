@@ -90,6 +90,7 @@ ref_mat <- matrix(1:116^2, nrow = 116, ncol = 116)
 ref_mat[!upper.tri(ref_mat)] <- NA
 
 groups <- matrix(NA, nrow = 116^2, ncol = 4)
+group_memberships <- list()
 eg_to_ng <- list()
 for (idx in 1:116^2) {
   cds <- which(ref_mat == idx, arr.ind = TRUE)
@@ -104,6 +105,7 @@ for (idx in 1:116^2) {
       group_lab <- paste0(group[1], "-", group[2], sep = "")
       
       groups[idx,l] <- group_lab
+      group_memberships[[group_lab]] <- append(group_memberships[[group_lab]], idx)
       
       if (is.null(eg_to_ng[[group_lab]])) {
         eg_to_ng[[group_lab]] <- group
@@ -132,13 +134,8 @@ for (i in 1:nrow(group_info)) {
   s_inf <- group_info[i,]
   
   s_group <- s_inf[1][[1]]
-  s_group_1 <- eg_to_ng[[s_group]][1]
-  s_group_2 <- eg_to_ng[[s_group]][2]
   
   s_res <- s_inf[2][[1]]
-  
-  s_nodes_1 <- node_groups[[s_res]][[s_group_1]]
-  s_nodes_2 <- node_groups[[s_res]][[s_group_2]]
   
   # For each group of lower resolution c_group for comparator, s_group_1 s_group_2 p_group_1 p_group_2, get node groups
   p_infs <- group_info[group_info$Resolution > s_res,]
@@ -149,18 +146,12 @@ for (i in 1:nrow(group_info)) {
       p_inf <- p_infs[j,]
       
       p_group <- p_inf[1][[1]]
-      p_group_1 <- eg_to_ng[[p_group]][1]
-      p_group_2 <- eg_to_ng[[p_group]][2]
       
       p_res <- p_inf[2][[1]]
       
-      p_nodes_1 <- node_groups[[p_res]][[p_group_1]]
-      p_nodes_2 <- node_groups[[p_res]][[p_group_2]]
-      
       # Add p_group to group_overlaps$s_group
       # If node group on s_group_1 and p_group_1 have nonzero overlap AND same on s_group_2 and p_group_2 have nonzero overlap
-      if (length(intersect(p_nodes_1, s_nodes_1)) * length(intersect(p_nodes_2, s_nodes_2)) > 0 | 
-          length(intersect(p_nodes_1, s_nodes_2)) * length(intersect(p_nodes_2, s_nodes_1)) > 0) {
+      if (length(intersect(group_memberships[[s_group]], group_memberships[[p_group]])) > 0) {
         s_overlaps <- append(s_overlaps, p_group)
       }
     }
