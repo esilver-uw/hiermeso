@@ -4,6 +4,7 @@
 library(R.matlab)
 library(abind)
 library(stringr)
+source("e_procedures.R")
 
 read_subjects <- function(block, type, lbls) {
   for (sub in list.files("./real_data/neurocon")) {
@@ -171,3 +172,60 @@ groups_from_ng <- function(L, N, node_groups) {
   return(list(groups, group_overlaps, group_memberships, group_info, eg_to_ng))
 }
 
+# Get test statistics for a given edge set
+# INPUT:
+# M: number of subjects per matrix
+# control_mats: array of matrices for the controls
+# treatment_mats: array of matrices for the treatments
+# edges: vector of edges in the group
+# OUTPUT: 
+# group_vec: vector of test statistics (p_val, cal_kappa(s), cal_mix, lr_mean(s), lr_prior(s))
+
+stats_vec <- function(M, control_mats, treatment_mats, edges) {
+  control_sm <- apply(control_mats, c(1,2), mean)
+  treatment_sm <- apply(treatment_mats, c(1,2), mean)
+  
+  n.edges <- M * length(edges)
+  
+  control_bar <- mean(control_sm[edges])
+  treatment_bar <- mean(treatment_sm[edges])
+  
+  d_bar <- control_bar - treatment_bar
+  
+  p_val <- p_value(d_bar, n.edges)
+  
+  kappas <- c(0.25, 0.5, 0.75)
+  cal_kappa_1 <- cal_kappa(p_val, kappas[1])
+  cal_kappa_2 <- cal_kappa(p_val, kappas[2])
+  cal_kappa_3 <- cal_kappa(p_val, kappas[3])
+  
+  cal_mix <- cal_mixture(p_val)
+  
+  pts <- c(2.5, 5, 7.5)
+  lr_mean_1 <- lr_delta(d_bar, n.edges, pts[1])
+  lr_mean_2 <- lr_delta(d_bar, n.edges, pts[2])
+  lr_mean_3 <- lr_delta(d_bar, n.edges, pts[3])
+  
+  priors <- c(5, 20, 35)
+  lr_prior_1 <- lr_prior(d_bar, n.edges, priors[1])
+  lr_prior_2 <- lr_prior(d_bar, n.edges, priors[2])
+  lr_prior_3 <- lr_prior(d_bar, n.edges, priors[3])
+  
+  return(c(p_val, cal_kappa_1, cal_kappa_2, cal_kappa_3, cal_mix, lr_mean_1, 
+           lr_mean_2, lr_mean_3, lr_prior_1, lr_prior_2, lr_prior_3))
+}
+
+fit_groups <- groups_from_ng(4, 116, node_groups)
+control_mats <- read_subjects("control", "AAL116", labs[,1][[1]])
+treatment_mats <- read_subjects("patient", "AAL116", labs[,1][[1]])
+
+LAB <- "Frontal.R-Parietal.L"
+RES <- 3
+M <- dim(control_mats)[3]
+
+edges <- which(fit_groups[[1]][,3] == LAB)
+stats_vec(M,control_mats,treatment_mats,edges)
+
+# Obvious problem! We need a t-test version.
+
+# From here, we join the stats vecs into a matrix and use that for the e_procedure. All code should be relatively reusable.
