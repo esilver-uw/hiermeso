@@ -212,10 +212,10 @@ stats_vec <- function(M, control_mats, treatment_mats, edges) {
   lr_n_2 <- lr_normal(d_bar, n.edges, s_1, s_2, priors[2])
   lr_n_3 <- lr_normal(d_bar, n.edges, s_1, s_2, priors[3])
   
-  priors <- c(5, 20, 35)
-  lr_t_1 <- lr_t(S_s, V_s, n.edges, priors[1])
-  lr_t_2 <- lr_t(S_s, V_s, n.edges, priors[2])
-  lr_t_3 <- lr_t(S_s, V_s, n.edges, priors[3])
+  # priors <- c(5, 20, 35)
+  # lr_t_1 <- lr_t(S_s, V_s, n.edges, priors[1])
+  # lr_t_2 <- lr_t(S_s, V_s, n.edges, priors[2])
+  # lr_t_3 <- lr_t(S_s, V_s, n.edges, priors[3])
   
   return(c(p_val, lr_n_1, lr_n_2, lr_n_3, lr_t_1, lr_t_2, lr_t_3))
 }
@@ -245,5 +245,3 @@ for (lab in fit_groups[[4]][,1]) {
   edges <- which(fit_groups[[1]] == lab, arr.ind = TRUE)[,1]
   stats_mat <- cbind(stats_mat, stats_vec(M, control_mats, treatment_mats, edges))
 }
-
-
