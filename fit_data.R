@@ -181,38 +181,43 @@ groups_from_ng <- function(L, N, node_groups) {
 # OUTPUT: 
 # group_vec: vector of test statistics (p_val, cal_kappa(s), cal_mix, lr_mean(s), lr_prior(s))
 
+# Some thinking will be required: verify the expression of sample standard deviation in terms of V_n and S_n for the difference of means case.
+
 stats_vec <- function(M, control_mats, treatment_mats, edges) {
-  control_sm <- apply(control_mats, c(1,2), mean)
-  treatment_sm <- apply(treatment_mats, c(1,2), mean)
+  control_sm <- apply(control_mats, c(1,2), sum)
+  treatment_sm <- apply(treatment_mats, c(1,2), sum)
+  control_sms <- apply(control_mats^2, c(1,2), sum)
+  treatment_sms <- apply(treatment_mats^2, c(1,2), sum)
   
   n.edges <- M * length(edges)
   
-  control_bar <- mean(control_sm[edges])
-  treatment_bar <- mean(treatment_sm[edges])
+  control_S <- sum(control_sm[edges])
+  treatment_S <- sum(treatment_sm[edges])
+  control_V <- sum(control_sms[edges])
+  treatment_V <- sum(control_sms[edges])
   
-  d_bar <- control_bar - treatment_bar
+  d_bar <- control_S/n.edges - treatment_S/n.edges
+  S_d <- control_S - treatment_S
+  S_s <- control_S + control_S
+  
+  s_1 <- sqrt((control_V + control_S^2)/(n.edges - 1))
+  s_2 <- sqrt((treatment_V + treatment_S^2)/(n.edges - 1))
+  
+  V_s <- control_V + treatment_V
   
   p_val <- p_value(d_bar, n.edges)
   
-  kappas <- c(0.25, 0.5, 0.75)
-  cal_kappa_1 <- cal_kappa(p_val, kappas[1])
-  cal_kappa_2 <- cal_kappa(p_val, kappas[2])
-  cal_kappa_3 <- cal_kappa(p_val, kappas[3])
-  
-  cal_mix <- cal_mixture(p_val)
-  
-  pts <- c(2.5, 5, 7.5)
-  lr_mean_1 <- lr_delta(d_bar, n.edges, pts[1])
-  lr_mean_2 <- lr_delta(d_bar, n.edges, pts[2])
-  lr_mean_3 <- lr_delta(d_bar, n.edges, pts[3])
+  priors <- c(5, 20, 35)
+  lr_n_1 <- lr_normal(d_bar, n.edges, s_1, s_2, priors[1])
+  lr_n_2 <- lr_normal(d_bar, n.edges, s_1, s_2, priors[2])
+  lr_n_3 <- lr_normal(d_bar, n.edges, s_1, s_2, priors[3])
   
   priors <- c(5, 20, 35)
-  lr_prior_1 <- lr_prior(d_bar, n.edges, priors[1])
-  lr_prior_2 <- lr_prior(d_bar, n.edges, priors[2])
-  lr_prior_3 <- lr_prior(d_bar, n.edges, priors[3])
+  lr_t_1 <- lr_t(S_s, V_s, n.edges, priors[1])
+  lr_t_2 <- lr_t(S_s, V_s, n.edges, priors[2])
+  lr_t_3 <- lr_t(S_s, V_s, n.edges, priors[3])
   
-  return(c(p_val, cal_kappa_1, cal_kappa_2, cal_kappa_3, cal_mix, lr_mean_1, 
-           lr_mean_2, lr_mean_3, lr_prior_1, lr_prior_2, lr_prior_3))
+  return(c(p_val, lr_n_1, lr_n_2, lr_n_3, lr_t_1, lr_t_2, lr_t_3))
 }
 
 fit_groups <- groups_from_ng(4, 116, node_groups)
@@ -227,5 +232,18 @@ edges <- which(fit_groups[[1]][,3] == LAB)
 stats_vec(M,control_mats,treatment_mats,edges)
 
 # Obvious problem! We need a t-test version.
+# Try using a sample variance, consider using the plug-in method as well. If sample variance is better, derive the mixture method
+# for the t-test.
+# Be sure to understand Example 3.24
+# Look into whether there are batch plug-in e-values.
 
 # From here, we join the stats vecs into a matrix and use that for the e_procedure. All code should be relatively reusable.
+
+# Putting both e-values in utils.
+stats_mat <- NULL
+for (lab in fit_groups[[4]][,1]) {
+  edges <- which(fit_groups[[1]] == lab, arr.ind = TRUE)[,1]
+  stats_mat <- cbind(stats_mat, stats_vec(M, control_mats, treatment_mats, edges))
+}
+
+
