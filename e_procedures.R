@@ -93,13 +93,14 @@ lr_delta <- function(d_bar, m, pt) {
 # Elicit a direct e-value using a mixture over a prior on the mean.
 # INPUT: 
 # d_bar: difference between A1 and A2.
+# s: sigma, or in our bad behaviour case the estimate.
 # m: total number of edges averaged.
 # ps: prior sigma; prior variance of the mean.
 # OUTPUT: 
 # e_value: an e_value.
-lr_prior <- function(d_bar, m, ps) {
+lr_prior <- function(d_bar, m, s, ps) {
   # Simply much more tractable in tau notation.
-  t <- SIGMA^(-2)
+  t <- s^(-2)
   t_0 <- ps^(-2)
   
   norm_term <- sqrt(t_0)/sqrt(m/2 * t + t_0)
@@ -123,71 +124,38 @@ lr_prior <- function(d_bar, m, ps) {
 # Given a difference stat and the two populations, return a p-value, assuming t-distribution.
 # INPUT:
 # d_bar: difference between A1 and A2.
-# s_1: standard deviation for group 1
-# s_2 standard deviation for group 2
+# s: standard deviation
 # m: total number of edges averaged.
 # OUTPUT: 
 # p_value: the p_value associated with the group-wise null hypothesis that A.1 and A.2 are generated from the same parameter matrix.
-p_t <- function(d_bar, s_1, s_2, m) {
-  d_bar <- abs(d_bar)
-  s = s_1 + s_2
-  p_value <- 2*pt(d_bar, sd = s, lower.tail = F)
+p_t <- function(d_bar, s, m) {
+  t <- abs(d_bar)/(2 * s / sqrt(m))
+  p_value <- 2*pt(t, df = 2*m - 2, lower.tail = F)
   
   return(p_value)
-}
-
-# Elicit a direct e-value using a mixture over a prior on the mean, assuming normality.
-# INPUT: 
-# d_bar: difference between A1 and A2.
-# m: total number of edges averaged.
-# s: sigma
-# ps: prior sigma; prior variance of the mean.
-# OUTPUT: 
-# e_value: an e_value.
-lr_normal <- function(d_bar, m, s_1, s_2, ps) {
-  # Simply much more tractable in tau notation.
-  t_1 <- s_1^(-2)
-  t_2 <- s_2^(-2)
-  t_0 <- ps^(-2)
-  
-  norm_term <- sqrt(t_0)/sqrt(m/(t_1+t_2) + t_0)
-  exp_term_num <- m^2/2*(t_1+t_2)^2*d_bar^2
-  exp_term_denom <- 2*(m/(t_1+t_2) + t_0)
-  
-  # combine into e-value.
-  e_value <- norm_term * exp(exp_term_num/exp_term_denom)
-  
-  # Threshold cutoff
-  if (e_value >= 1e+10) {
-    e_value <- 1e+10
-  }
-  if (e_value <= 1e-5) {
-    e_value <- 1e-5
-  }
-  
-  return(e_value)
 }
 
 # For now, patch using abs.
 
 # Elicit a direct e-value using a mixture over a prior on the mean, assuming t-distribution.
 # INPUT: 
-# S_d: difference between A1 and A2 totals.
-# V_s: sum of squares of both A1 and A2
+# d: difference between A1 and A2 means.
+# s: pooled standard deviation of both A1 and A2
 # m: total number of edges averaged.
-# ps: prior sigma; prior variance of the mean.
+# c: prior sigma; prior variance of the mean.
 # OUTPUT: 
 # e_value: an e_value.
-lr_t <- function(S_d, V_s, m, ps) {
+lr_t <- function(d, s, m, c) {
   # Simply much more tractable in tau notation.
-  c <- ps^(-1)
   
-  norm_term <- sqrt(c^2/(m+c^2))
-  exp_term_num <- (m+c^2)*V_s
-  exp_term_denom <- (m+c^2)*V_s - S_d^2
+  k <- 2*m-2
+  
+  norm <- (1 + c^2)
+  num <- 2 * s^2 * (1 + c^2) * k + m * d^2
+  denom <- 2 * s^2 * (1 + c^2) * k + m * (1 + c^2) * d^2
   
   # combine into e-value.
-  e_value <- norm_term * (exp_term_num / abs(exp_term_denom))^(m/2)
+  e_value <- norm^(-1/2) * (num/denom)^(-(k+1)/2)
   
   # Threshold cutoff
   if (e_value >= 1e+10) {

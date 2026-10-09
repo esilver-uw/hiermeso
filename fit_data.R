@@ -5,6 +5,40 @@ library(R.matlab)
 library(abind)
 library(stringr)
 source("e_procedures.R")
+source("sim_utils.R")
+
+# Run eLP: Largely adapted from Gablenz & Sabatti.
+# INPUT:
+# e_vals: vector of e_values by aligned with groups
+# groups: the groups
+# t_groups: vector of group names used.
+# alpha: alpha level of the test.
+# OUTPUT: 
+# detections: hypotheses rejected by the algorithm.
+elp <- function(e_vals, groups, t_groups, alpha) {
+  # Get number of base level hypotheses and number of total hypotheses
+  n_base_level <- length(intersect(groups[[4]][groups[[4]]$Resolution == 1,4], t_groups))
+  n_groups <- length(t_groups)
+  
+  x <- CVXR::Variable(n_groups, integer = TRUE)
+  objective <- CVXR::Maximize(sum(x))
+  
+  location_constraint_matrix <- create_lcm(groups, n_base_level, n_groups)
+  
+  b <- rep(1, n_base_level)
+  constraints <- list(x >= 0,
+                      x <= 1,
+                      t(location_constraint_matrix) %*% x <= b)
+  
+  constraints <- c(constraints, list(n_groups - e_vals * alpha * sum(x) <= n_groups * (1 - x)))
+  
+  problem <- CVXR::Problem(objective = objective, constraints = constraints)
+  
+  result <- psolve(problem)
+  selections <- value(x)
+  
+  return(selections)
+}
 
 read_subjects <- function(block, type, lbls) {
   for (sub in list.files("./real_data/neurocon")) {
@@ -186,36 +220,32 @@ groups_from_ng <- function(L, N, node_groups) {
 stats_vec <- function(M, control_mats, treatment_mats, edges) {
   control_sm <- apply(control_mats, c(1,2), sum)
   treatment_sm <- apply(treatment_mats, c(1,2), sum)
-  control_sms <- apply(control_mats^2, c(1,2), sum)
-  treatment_sms <- apply(treatment_mats^2, c(1,2), sum)
   
   n.edges <- M * length(edges)
   
-  control_S <- sum(control_sm[edges])
-  treatment_S <- sum(treatment_sm[edges])
-  control_V <- sum(control_sms[edges])
-  treatment_V <- sum(control_sms[edges])
+  control_mean <- sum(control_sm[edges])/n.edges
+  treatment_mean <- sum(treatment_sm[edges])/n.edges
   
-  d_bar <- control_S/n.edges - treatment_S/n.edges
-  S_d <- control_S - treatment_S
-  S_s <- control_S + control_S
+  d_bar <- treatment_mean - control_mean
   
-  s_1 <- sqrt((control_V + control_S^2)/(n.edges - 1))
-  s_2 <- sqrt((treatment_V + treatment_S^2)/(n.edges - 1))
+  control_sms <- apply((control_mats - control_mean)^2, c(1,2), sum)
+  treatment_sms <- apply((treatment_mats - treatment_mean)^2, c(1,2), sum)
   
-  V_s <- control_V + treatment_V
+  pooled_sms <- control_sms + treatment_sms
+  pooled_var <- sum(pooled_sms[edges])/(2 * n.edges - 2)
+  s <- sqrt(pooled_var)
   
-  p_val <- p_value(d_bar, n.edges)
+  p_val <- p_t(d_bar, s, n.edges)
   
-  priors <- c(5, 20, 35)
-  lr_n_1 <- lr_normal(d_bar, n.edges, s_1, s_2, priors[1])
-  lr_n_2 <- lr_normal(d_bar, n.edges, s_1, s_2, priors[2])
-  lr_n_3 <- lr_normal(d_bar, n.edges, s_1, s_2, priors[3])
+  priors <- c(7, 12, 19)
+  lr_n_1 <- lr_prior(d_bar, n.edges, s, priors[1])
+  lr_n_2 <- lr_prior(d_bar, n.edges, s, priors[2])
+  lr_n_3 <- lr_prior(d_bar, n.edges, s, priors[3])
   
-  # priors <- c(5, 20, 35)
-  # lr_t_1 <- lr_t(S_s, V_s, n.edges, priors[1])
-  # lr_t_2 <- lr_t(S_s, V_s, n.edges, priors[2])
-  # lr_t_3 <- lr_t(S_s, V_s, n.edges, priors[3])
+  priors <- c(4, 5, 6)
+  lr_t_1 <- lr_t(d_bar, s, n.edges, priors[1])
+  lr_t_2 <- lr_t(d_bar, s, n.edges, priors[2])
+  lr_t_3 <- lr_t(d_bar, s, n.edges, priors[3])
   
   return(c(p_val, lr_n_1, lr_n_2, lr_n_3, lr_t_1, lr_t_2, lr_t_3))
 }
@@ -244,4 +274,13 @@ stats_mat <- NULL
 for (lab in fit_groups[[4]][,1]) {
   edges <- which(fit_groups[[1]] == lab, arr.ind = TRUE)[,1]
   stats_mat <- cbind(stats_mat, stats_vec(M, control_mats, treatment_mats, edges))
+}
+
+dec_mat <- matrix(NA, nrow = dim(stats_mat)[1], ncol = dim(stats_mat)[2])
+for (j in which(fit_groups[[4]]$Resolution == 4)) {
+  dec_mat[1,j] <- as.integer(p.adjust(stats_mat[1,j], method = "BH") <= 0.05)
+}
+
+for (i in 2:dim(stats_mat)[1]) {
+  dec_mat[i,] <- t(elp(stats_mat[i,], fit_groups, fit_groups[[4]]$res_Group, 0.05))
 }
