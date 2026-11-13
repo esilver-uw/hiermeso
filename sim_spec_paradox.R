@@ -160,6 +160,7 @@ pset_elp <- function(e_vals, pset_groups, lcm, alpha, lambda = 0) {
 # Weight parameter is an exponent from -1 to 1
 # Write down some of these cases. "How many small groups do I want to need to beat a big group"
 # Also add a half coverage case (2/4 present) and a hidden tiny signal case.
+# Can we make the weights depend on the data?
 get_weight <- function(lambda, groups) {
   weights <- rep(NA, length(groups))
   for (i in 1:length(groups)) {
