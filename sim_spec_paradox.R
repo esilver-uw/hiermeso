@@ -1,6 +1,7 @@
 # Runs a simulation intended to replicate Rosenblatt et al.'s spatial specificity paradox in complement.
 
 source("sim_utils.R")
+source("e_procedures.R")
 
 # Get test statistics for a given edge set
 # INPUT:
@@ -131,11 +132,14 @@ pset_e_vals <- function(M, A1, A2, pset_groups, s, ps) {
   return(e_vals)
 }
 
-pset_elp <- function(e_vals, pset_groups, lcm, alpha) {
+pset_elp <- function(e_vals, pset_groups, lcm, alpha, lambda = 0) {
   n_groups <- dim(lcm)[1]
   n_base_level <- dim(lcm)[2]
   x <- CVXR::Variable(n_groups, integer = TRUE)
-  objective <- CVXR::Maximize(sum(x))
+  
+  weights <- get_weight(lambda, pset_groups)
+  
+  objective <- CVXR::Maximize(sum(weights * x))
   
   b <- rep(1, n_base_level)
   constraints <- list(x >= 0,
@@ -150,6 +154,11 @@ pset_elp <- function(e_vals, pset_groups, lcm, alpha) {
   selections <- value(x)
   
   return(selections)
+}
+
+# Weight parameter is an exponent from -1 to 1
+get_weight <- function(lambda, group) {
+  length(group)^lambda
 }
 
 SIZES <- c(2, 4, 8)
@@ -207,7 +216,7 @@ props <- list()
 avg_res <- list()
 indices_mat <- list() 
 
-iterations <- 20
+iterations <- 1
 
 for (i in 1:iterations) {
   props[[i]] <- NULL
