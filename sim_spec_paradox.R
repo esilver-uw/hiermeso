@@ -1,0 +1,242 @@
+# Runs a simulation intended to replicate Rosenblatt et al.'s spatial specificity paradox in complement.
+
+source("sim_utils.R")
+
+# Get test statistics for a given edge set
+# INPUT:
+# M: number of subjects per matrix
+# control_mats: array of matrices for the controls
+# treatment_mats: array of matrices for the treatments
+# edges: vector of edges in the group
+# OUTPUT: 
+# group_vec: vector of test statistics (p_val, cal_kappa(s), cal_mix, lr_mean(s), lr_prior(s))
+
+# Some thinking will be required: verify the expression of sample standard deviation in terms of V_n and S_n for the difference of means case.
+
+e_vals <- function(M, A1, A2, groups, s, ps) {
+  e_vals <- rep(NA, length(groups[[4]][,1]))
+  for (i in 1:length(groups[[4]][,1])) {
+    lab <- groups[[4]][i,4]
+    
+    edges <- GROUPS[[3]][[lab]]
+    
+    control_sm <- apply(A1, c(1,2), sum)
+    treatment_sm <- apply(A2, c(1,2), sum)
+    
+    n.edges <- M * length(edges)
+    
+    control_mean <- sum(control_sm[edges])/n.edges
+    treatment_mean <- sum(treatment_sm[edges])/n.edges
+    
+    d_bar <- treatment_mean - control_mean
+    
+    e_vals[i] <- lr_prior(d_bar, n.edges, s, ps)
+  }
+  
+  return(e_vals)
+}
+
+# Try bigger networks
+# Try weights
+# Try building the nested powerset of 16x16 
+
+# Nested powerset
+
+# Source - https://stackoverflow.com/a/18718066
+# Posted by Vincent Zoonekynd
+# Retrieved 2026-11-11, License - CC BY-SA 3.0
+
+powerset <- function(set) { 
+  n <- length(set)
+  masks <- 2^(1:n-1)
+  lapply( 1:2^n-1, function(u) set[ bitwAnd(u, masks) != 0 ] )
+}
+
+get_powerset_groups <- function(mat, size = dim(mat)[1]) {
+  tri <- matrix(1:16^2, nrow = 16)[upper.tri(matrix(1:16^2, nrow = 16), T)]
+  pset_groups <- list()
+  splits <- split(1:size, rep(1:2, each = size/2))
+  g <- 1
+  group_nuclei <- list()
+  for (i in 1:2) {
+    for (j in 1:2) {
+      mat_sub <- mat[splits[[i]], splits[[j]]]
+      if (length(intersect(mat_sub, tri)) > 0) {
+        group_nuclei[[g]] <- intersect(mat_sub, tri)
+        g <- g + 1
+      }
+    }
+  }
+  
+  pset <- powerset(1:length(group_nuclei))
+  pset <- pset[-c(1, length(pset))]
+  
+  gc <- 1
+  for (set in pset) {
+    if (length(set) > 0) {
+      temp <- NULL
+      for (i in set) {
+        temp <- append(temp, group_nuclei[[i]])
+      }
+      pset_groups[[gc]] <- temp
+      gc <- gc + 1
+    }
+  }
+  return(pset_groups)
+}
+
+Mat <- matrix(1:16^2, nrow = 16)
+tri <- matrix(1:16^2, nrow = 16)[upper.tri(matrix(1:16^2, nrow = 16), T)]
+pset_groups <- list()
+pset_groups[[1]] <- tri
+
+for (size in c(8, 4, 2)) {
+  splits <- split(1:16, rep(1:(16/size), each = size))
+  for (i in 1:(16/size)) {
+    for (j in 1:(16/size)) {
+      Mat_split <- matrix(1:16^2, nrow = 16)[splits[[i]], splits[[j]]]
+      if (length(intersect(Mat_split, tri)) > 0) {
+        pset_groups <- c(pset_groups, get_powerset_groups(Mat_split))
+      }
+    }
+  }
+}
+
+names(pset_groups) <- paste0("group_", 1:length(pset_groups))
+
+lcm <- matrix(0, length(pset_groups), length(tri))
+for (i in 1:dim(lcm)[1]) {
+  indices <- which(tri %in% pset_groups[[i]])
+  lcm[i, indices] <- 1
+}
+
+pset_e_vals <- function(M, A1, A2, pset_groups, s, ps) {
+  e_vals <- rep(NA, length(pset_groups))
+  for (i in 1:length(pset_groups)) {
+    indices <- pset_groups[[i]]
+    
+    control_sm <- apply(A1, c(1,2), sum)
+    treatment_sm <- apply(A2, c(1,2), sum)
+    
+    n.edges <- M * length(indices)
+    
+    control_mean <- sum(control_sm[indices])/n.edges
+    treatment_mean <- sum(treatment_sm[indices])/n.edges
+    
+    d_bar <- treatment_mean - control_mean
+    
+    e_vals[i] <- lr_prior(d_bar, n.edges, s, ps)
+  }
+  
+  return(e_vals)
+}
+
+pset_elp <- function(e_vals, pset_groups, lcm, alpha) {
+  n_groups <- dim(lcm)[1]
+  n_base_level <- dim(lcm)[2]
+  x <- CVXR::Variable(n_groups, integer = TRUE)
+  objective <- CVXR::Maximize(sum(x))
+  
+  b <- rep(1, n_base_level)
+  constraints <- list(x >= 0,
+                      x <= 1,
+                      t(lcm) %*% x <= b)
+  
+  constraints <- c(constraints, list(n_groups - e_vals * alpha * sum(x) <= n_groups * (1 - x)))
+  
+  problem <- CVXR::Problem(objective = objective, constraints = constraints)
+  
+  result <- psolve(problem)
+  selections <- value(x)
+  
+  return(selections)
+}
+
+SIZES <- c(2, 4, 8)
+GROUPS <- generate_groups(SIZES, 16)
+SIGMA <- 20
+PRIOR <- 5
+M <- 25
+
+SIGNAL.1 <- 20
+SIGNAL.2 <- 20
+SIGNAL.3 <- 20
+
+T1 <- matrix(0, nrow = 16, ncol = 16)
+
+# Add the signals up
+T2 <- T1
+T2[1:8,-(1:8)] <- matrix(SIGNAL.1, nrow = 8, ncol = 8)
+T2[1:4,-(1:12)] <- matrix(SIGNAL.2, nrow = 4, ncol = 4)
+T2[1:2,-(1:14)] <- matrix(SIGNAL.3, nrow = 2, ncol = 2)
+
+A1 <- sample_network(T1, M, SIGMA)
+
+A2 <- sample_network(T2, M, SIGMA)
+e_vals(M, A1, A2, GROUPS, SIGMA, PRIOR)
+e_vec <- e_vals(M, A1, A2, GROUPS, SIGMA, PRIOR)
+GROUPS[[4]]$res_Group[which(elp(e_vec, GROUPS, GROUPS[[4]]$res_Group, 0.05) == 1)]
+
+demo_mat <- T1
+for (g in GROUPS[[4]][GROUPS[[4]][,2] == 3,4]) {
+  demo_mat[GROUPS[[3]][[g]]] <- as.numeric(strsplit(g, "_")[[1]][4])
+}
+demo_mat
+
+props <- NULL
+for (sigma in c(80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20)) {
+  A1 <- sample_network(T1, M, sigma)
+  A2 <- sample_network(T2, M, sigma)
+  e_vec <- e_vals(M, A1, A2, GROUPS, sigma, PRIOR)
+  selex <- GROUPS[[4]]$res_Group[which(elp(e_vec, GROUPS, GROUPS[[4]]$res_Group, 0.05) == 1)]
+  edges <- NULL
+  for (s in selex) {
+    edges <- append(edges, GROUPS[[3]][[s]])
+  }
+  
+  props <- append(props, length(edges)/length(GROUPS[[3]]$res_3_group_2))
+}
+names(props) <- c(80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20)
+print(props)
+
+# Get the sawtooth graph by continuously varying sigma with replications.
+
+sigmas <- seq(100, 1, by = -1)
+
+props <- list()
+avg_res <- list()
+indices_mat <- list() 
+
+iterations <- 20
+
+for (i in 1:iterations) {
+  props[[i]] <- NULL
+  avg_res[[i]] <- NULL
+  indices_mat[[i]] <- matrix(0, nrow = 256, ncol = length(sigmas))
+  j <- 1
+  
+  for (sigma in sigmas) {
+    A1 <- sample_network(T1, M, sigma)
+    A2 <- sample_network(T2, M, sigma)
+    e_vec <- pset_e_vals(M, A1, A2, pset_groups, sigma, PRIOR)
+    selex <- pset_groups[which(pset_elp(e_vec, pset_groups, lcm, 0.05) == 1)]
+    indices <- NULL
+    ress <- NULL
+    
+    for (s in selex) {
+      indices <- append(indices, s)
+      ress <- append(ress, length(s))
+    }
+    
+    indices_mat[[i]][indices, j] <- 1
+    j <- j + 1
+    
+    props[[i]] <- append(props, length(indices)/length(GROUPS[[3]]$res_3_group_2))
+    avg_res[[i]] <- append(avg_res, 1/mean(ress))
+  }
+}
+
+
+# Get a 1:100 grid and go over it, and use a sample size. Also implement weights. 
+# For writing the simulation, set in stone the e_value method. 
+# Roadmap for Friday.

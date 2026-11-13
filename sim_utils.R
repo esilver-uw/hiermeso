@@ -100,10 +100,10 @@ generate_groups <- function(group_sizes, n) {
 # n: sample size
 # OUTPUT: 
 # A: array of n observed adjacency matrices
-sample_network <- function(theta, n) {
+sample_network <- function(theta, n, s) {
   A <- array(NA, dim = c(dim(theta)[1], dim(theta)[2], n))
   for (i in 1:n) {
-    A[,,i] <-  matrix(rnorm(length(theta), theta, SIGMA), nrow = dim(theta)[1], ncol = dim(theta)[2])
+    A[,,i] <-  matrix(rnorm(length(theta), theta, s), nrow = dim(theta)[1], ncol = dim(theta)[2])
   }
   return(A)
 }
@@ -152,15 +152,15 @@ create_lcm <- function(groups, n_base_level, n_groups) {
 # alpha: alpha level of the test.
 # OUTPUT: 
 # detections: hypotheses rejected by the algorithm.
-elp <- function(e_vals, t_groups, alpha) {
+elp <- function(e_vals, groups, t_groups, alpha) {
   # Get number of base level hypotheses and number of total hypotheses
-  n_base_level <- length(intersect(GROUPS[[4]][GROUPS[[4]]$Resolution == 1,4], t_groups))
+  n_base_level <- length(intersect(groups[[4]][groups[[4]]$Resolution == 1,4], t_groups))
   n_groups <- length(t_groups)
   
   x <- CVXR::Variable(n_groups, integer = TRUE)
   objective <- CVXR::Maximize(sum(x))
   
-  location_constraint_matrix <- create_lcm(GROUPS, n_base_level, n_groups)
+  location_constraint_matrix <- create_lcm(groups, n_base_level, n_groups)
   
   b <- rep(1, n_base_level)
   constraints <- list(x >= 0,
