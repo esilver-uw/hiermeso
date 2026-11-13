@@ -156,9 +156,16 @@ pset_elp <- function(e_vals, pset_groups, lcm, alpha, lambda = 0) {
   return(selections)
 }
 
+# Try log a as well.
 # Weight parameter is an exponent from -1 to 1
-get_weight <- function(lambda, group) {
-  length(group)^lambda
+# Write down some of these cases. "How many small groups do I want to need to beat a big group"
+# Also add a half coverage case (2/4 present) and a hidden tiny signal case.
+get_weight <- function(lambda, groups) {
+  weights <- rep(NA, length(groups))
+  for (i in 1:length(groups)) {
+    weights[i] <- length(groups[[i]])^lambda
+  }
+  return(weights)
 }
 
 SIZES <- c(2, 4, 8)
@@ -212,23 +219,22 @@ print(props)
 
 sigmas <- seq(100, 1, by = -1)
 
-props <- list()
-avg_res <- list()
-indices_mat <- list() 
+props_list <- list()
+avg_res_list <- list()
 
-iterations <- 1
+iterations <- 2
 
 for (i in 1:iterations) {
-  props[[i]] <- NULL
-  avg_res[[i]] <- NULL
-  indices_mat[[i]] <- matrix(0, nrow = 256, ncol = length(sigmas))
+  props <- NULL
+  avg_res <- NULL
+  indices_mat <- matrix(0, nrow = 256, ncol = length(sigmas))
   j <- 1
   
   for (sigma in sigmas) {
     A1 <- sample_network(T1, M, sigma)
     A2 <- sample_network(T2, M, sigma)
     e_vec <- pset_e_vals(M, A1, A2, pset_groups, sigma, PRIOR)
-    selex <- pset_groups[which(pset_elp(e_vec, pset_groups, lcm, 0.05) == 1)]
+    selex <- pset_groups[which(pset_elp(e_vec, pset_groups, lcm, 0.05, 0.25) == 1)]
     indices <- NULL
     ress <- NULL
     
@@ -237,13 +243,33 @@ for (i in 1:iterations) {
       ress <- append(ress, length(s))
     }
     
-    indices_mat[[i]][indices, j] <- 1
+    indices_mat[indices, j] <- 1
     j <- j + 1
     
-    props[[i]] <- append(props, length(indices)/length(GROUPS[[3]]$res_3_group_2))
-    avg_res[[i]] <- append(avg_res, 1/mean(ress))
+    props <- append(props, length(intersect(indices, GROUPS[[3]]$res_3_group_2))/length(GROUPS[[3]]$res_3_group_2))
+    if (!is.null(ress)) {
+      avg_res <- append(avg_res, 1/mean(ress))
+    } else {
+      avg_res <- append(avg_res, NA)
+    }
+    
   }
+  props_list[[i]] <- props
+  avg_res_list[[i]] <- avg_res
 }
+
+cond_mean <- \(x) mean(x[x != 0], na.rm = TRUE)
+
+props_means <- apply(do.call(rbind, props_list), 2, cond_mean)
+avg_res_means <- apply(do.call(rbind, avg_res_list), 2, cond_mean)
+
+for (i in 1:length(props_means)) {
+  if (is.nan(props_means[i])) props_means[i] <- NA
+  if (is.nan(avg_res_means[i])) avg_res_means[i] <- NA
+}
+
+plot(avg_res_means, type = "l", col = "red")
+lines(props_means)
 
 
 # Get a 1:100 grid and go over it, and use a sample size. Also implement weights. 
