@@ -90,24 +90,36 @@ Mat <- matrix(1:16^2, nrow = 16)
 tri <- matrix(1:16^2, nrow = 16)[upper.tri(matrix(1:16^2, nrow = 16), T)]
 pset_groups <- list()
 pset_groups[[1]] <- tri
+ord_groups <- list()
+ord_groups[[1]] <- tri
 
-for (size in c(8, 4, 2)) {
+for (size in c(8, 4, 2, 1)) {
   splits <- split(1:16, rep(1:(16/size), each = size))
   for (i in 1:(16/size)) {
     for (j in 1:(16/size)) {
       Mat_split <- matrix(1:16^2, nrow = 16)[splits[[i]], splits[[j]]]
       if (length(intersect(Mat_split, tri)) > 0) {
-        pset_groups <- c(pset_groups, get_powerset_groups(Mat_split))
+        if (size > 1) {
+          pset_groups <- c(pset_groups, get_powerset_groups(Mat_split))
+        }
+        ord_groups[[length(ord_groups) + 1]] <- intersect(Mat_split, tri)
       }
     }
   }
 }
 
 names(pset_groups) <- paste0("group_", 1:length(pset_groups))
+names(ord_groups) <- paste0("group_", 1:length(ord_groups))
 
-lcm <- matrix(0, length(pset_groups), length(tri))
-for (i in 1:dim(lcm)[1]) {
+pset_lcm <- matrix(0, length(pset_groups), length(tri))
+for (i in 1:dim(pset_lcm)[1]) {
   indices <- which(tri %in% pset_groups[[i]])
+  lcm[i, indices] <- 1
+}
+
+ord_lcm <- matrix(0, length(ord_groups), length(tri))
+for (i in 1:dim(ord_lcm)[1]) {
+  indices <- which(tri %in% ord_groups[[i]])
   lcm[i, indices] <- 1
 }
 
@@ -163,8 +175,14 @@ pset_elp <- function(e_vals, pset_groups, lcm, alpha, lambda = 0) {
 # Can we make the weights depend on the data?
 get_weight <- function(lambda, groups) {
   weights <- rep(NA, length(groups))
-  for (i in 1:length(groups)) {
-    weights[i] <- length(groups[[i]])^lambda
+  if (lambda == "log") {
+    for (i in 1:length(groups)) {
+      weights[i] <- log(length(groups[[i]]))
+    }
+  } else {
+    for (i in 1:length(groups)) {
+      weights[i] <- length(groups[[i]])^lambda
+    }
   }
   return(weights)
 }
