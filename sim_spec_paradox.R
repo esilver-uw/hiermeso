@@ -114,13 +114,13 @@ names(ord_groups) <- paste0("group_", 1:length(ord_groups))
 pset_lcm <- matrix(0, length(pset_groups), length(tri))
 for (i in 1:dim(pset_lcm)[1]) {
   indices <- which(tri %in% pset_groups[[i]])
-  lcm[i, indices] <- 1
+  pset_lcm[i, indices] <- 1
 }
 
 ord_lcm <- matrix(0, length(ord_groups), length(tri))
 for (i in 1:dim(ord_lcm)[1]) {
   indices <- which(tri %in% ord_groups[[i]])
-  lcm[i, indices] <- 1
+  ord_lcm[i, indices] <- 1
 }
 
 pset_e_vals <- function(M, A1, A2, pset_groups, s, ps) {
@@ -236,59 +236,95 @@ print(props)
 
 # Get the sawtooth graph by continuously varying sigma with replications.
 
+FULL.SIGNAL <- 1280
+
+DIFFUSE.TRUE <- GROUPS[[3]]$res_3_group_2
+HALF.TRUE <- c(GROUPS[[3]]$res_2_group_6, GROUPS[[3]]$res_2_group_7)
+POINT.TRUE <- 241
+
 sigmas <- seq(100, 1, by = -1)
 
-props_list <- list()
-avg_res_list <- list()
+props_means <- list()
+avg_res_means <- list()
+overs_means <- list()
 
-iterations <- 2
+iterations <- 20
 
-for (i in 1:iterations) {
-  props <- NULL
-  avg_res <- NULL
-  indices_mat <- matrix(0, nrow = 256, ncol = length(sigmas))
-  j <- 1
-  
-  for (sigma in sigmas) {
-    A1 <- sample_network(T1, M, sigma)
-    A2 <- sample_network(T2, M, sigma)
-    e_vec <- pset_e_vals(M, A1, A2, pset_groups, sigma, PRIOR)
-    selex <- pset_groups[which(pset_elp(e_vec, pset_groups, lcm, 0.05, 0.25) == 1)]
-    indices <- NULL
-    ress <- NULL
-    
-    for (s in selex) {
-      indices <- append(indices, s)
-      ress <- append(ress, length(s))
-    }
-    
-    indices_mat[indices, j] <- 1
-    j <- j + 1
-    
-    props <- append(props, length(intersect(indices, GROUPS[[3]]$res_3_group_2))/length(GROUPS[[3]]$res_3_group_2))
-    if (!is.null(ress)) {
-      avg_res <- append(avg_res, 1/mean(ress))
-    } else {
-      avg_res <- append(avg_res, NA)
-    }
-    
-  }
-  props_list[[i]] <- props
-  avg_res_list[[i]] <- avg_res
-}
+sim_groups <- pset_groups
+sim_lcm <- pset_lcm
 
 cond_mean <- \(x) mean(x[x != 0], na.rm = TRUE)
 
-props_means <- apply(do.call(rbind, props_list), 2, cond_mean)
-avg_res_means <- apply(do.call(rbind, avg_res_list), 2, cond_mean)
-
-for (i in 1:length(props_means)) {
-  if (is.nan(props_means[i])) props_means[i] <- NA
-  if (is.nan(avg_res_means[i])) avg_res_means[i] <- NA
+for (true_signal in list(DIFFUSE.TRUE, HALF.TRUE, POINT.TRUE)) {
+  T2 <- T1
+  T2[true_signal] <- T2[true_signal] + FULL.SIGNAL / length(true_signal)
+  props_list <- list()
+  avg_res_list <- list()
+  overs_list <- list()
+  
+  for (i in 1:iterations) {
+    props <- NULL
+    overs <- NULL
+    avg_res <- NULL
+    indices_mat <- matrix(0, nrow = 256, ncol = length(sigmas))
+    j <- 1
+    
+    for (sigma in sigmas) {
+      A1 <- sample_network(T1, M, sigma)
+      A2 <- sample_network(T2, M, sigma)
+      e_vec <- pset_e_vals(M, A1, A2, sim_groups, sigma, PRIOR)
+      selex <- pset_groups[which(pset_elp(e_vec, sim_groups, sim_lcm, 0.05, 0.25) == 1)]
+      indices <- NULL
+      ress <- NULL
+      
+      for (s in selex) {
+        indices <- append(indices, s)
+        ress <- append(ress, length(s))
+      }
+      
+      indices_mat[indices, j] <- 1
+      j <- j + 1
+      
+      props <- append(props, length(intersect(indices, true_signal))/length(true_signal))
+      if (length(intersect(indices, true_signal)) > 0) {
+        overs <- append(overs, length(indices)/length(intersect(indices, true_signal)) - 1)
+      } else {
+        overs <- append(overs, 0)
+      }
+      
+      if (!is.null(ress)) {
+        avg_res <- append(avg_res, 1/mean(ress))
+      } else {
+        avg_res <- append(avg_res, NA)
+      }
+      
+    }
+    props_list[[i]] <- props
+    avg_res_list[[i]] <- avg_res
+    overs_list[[i]] <- overs
+  }
+  props_means[[length(props_means) + 1]] <- apply(do.call(rbind, props_list), 2, cond_mean)
+  avg_res_means[[length(avg_res_means) + 1]] <- apply(do.call(rbind, avg_res_list), 2, cond_mean)
+  overs_means[[length(overs_means) + 1]] <- apply(do.call(rbind, overs_list), 2, cond_mean) / length(tri)
+  
+  for (i in 1:length(props_means)) {
+    if (is.nan(props_means[[length(props_means)]][i])) props_means[i] <- NA
+    if (is.nan(avg_res_means[[length(avg_res_means)]][i])) avg_res_means[i] <- NA
+    if (is.nan(overs_means[[length(overs_means)]][i])) overs_means[i] <- NA
+  }
 }
 
-plot(avg_res_means, type = "l", col = "red")
-lines(props_means)
+plot(avg_res_means[[1]], type = "l", col = "red")
+lines(props_means[[1]])
+lines(overs_means[[1]], col = "blue")
+
+plot(avg_res_means[[2]], type = "l", col = "red")
+lines(props_means[[2]])
+lines(overs_means[[2]], col = "blue")
+
+plot(avg_res_means[[3]], type = "l", col = "red")
+lines(props_means[[3]])
+lines(overs_means[[3]], col = "blue")
 
 
 # Get a 1:100 grid and go over it, and use a sample size. Also implement weights. 
