@@ -255,62 +255,69 @@ sim_lcm <- pset_lcm
 
 cond_mean <- \(x) mean(x[x != 0], na.rm = TRUE)
 
-for (true_signal in list(DIFFUSE.TRUE, HALF.TRUE, POINT.TRUE)) {
-  T2 <- T1
-  T2[true_signal] <- T2[true_signal] + FULL.SIGNAL / length(true_signal)
-  props_list <- list()
-  avg_res_list <- list()
-  overs_list <- list()
-  
-  for (i in 1:iterations) {
-    props <- NULL
-    overs <- NULL
-    avg_res <- NULL
-    indices_mat <- matrix(0, nrow = 256, ncol = length(sigmas))
-    j <- 1
+lambdas <- seq(from = -1, to = 1, length.out = 9)
+
+for (lambda in lambdas) {
+  props_means[[lambda]] <- list()
+  avg_res_means[[lambda]] <- list()
+  overs_means[[lambda]] <- list()
+  for (true_signal in list(DIFFUSE.TRUE, HALF.TRUE, POINT.TRUE)) {
+    T2 <- T1
+    T2[true_signal] <- T2[true_signal] + FULL.SIGNAL / length(true_signal)
+    props_list <- list()
+    avg_res_list <- list()
+    overs_list <- list()
     
-    for (sigma in sigmas) {
-      A1 <- sample_network(T1, M, sigma)
-      A2 <- sample_network(T2, M, sigma)
-      e_vec <- pset_e_vals(M, A1, A2, sim_groups, sigma, PRIOR)
-      selex <- pset_groups[which(pset_elp(e_vec, sim_groups, sim_lcm, 0.05, 0.25) == 1)]
-      indices <- NULL
-      ress <- NULL
+    for (i in 1:iterations) {
+      props <- NULL
+      overs <- NULL
+      avg_res <- NULL
+      indices_mat <- matrix(0, nrow = 256, ncol = length(sigmas))
+      j <- 1
       
-      for (s in selex) {
-        indices <- append(indices, s)
-        ress <- append(ress, length(s))
+      for (sigma in sigmas) {
+        A1 <- sample_network(T1, M, sigma)
+        A2 <- sample_network(T2, M, sigma)
+        e_vec <- pset_e_vals(M, A1, A2, sim_groups, sigma, PRIOR)
+        selex <- pset_groups[which(pset_elp(e_vec, sim_groups, sim_lcm, 0.05, lambda) == 1)]
+        indices <- NULL
+        ress <- NULL
+        
+        for (s in selex) {
+          indices <- append(indices, s)
+          ress <- append(ress, length(s))
+        }
+        
+        indices_mat[indices, j] <- 1
+        j <- j + 1
+        
+        props <- append(props, length(intersect(indices, true_signal))/length(true_signal))
+        if (length(intersect(indices, true_signal)) > 0) {
+          overs <- append(overs, length(indices)/length(intersect(indices, true_signal)) - 1)
+        } else {
+          overs <- append(overs, 0)
+        }
+        
+        if (!is.null(ress)) {
+          avg_res <- append(avg_res, 1/mean(ress))
+        } else {
+          avg_res <- append(avg_res, NA)
+        }
+        
       }
-      
-      indices_mat[indices, j] <- 1
-      j <- j + 1
-      
-      props <- append(props, length(intersect(indices, true_signal))/length(true_signal))
-      if (length(intersect(indices, true_signal)) > 0) {
-        overs <- append(overs, length(indices)/length(intersect(indices, true_signal)) - 1)
-      } else {
-        overs <- append(overs, 0)
-      }
-      
-      if (!is.null(ress)) {
-        avg_res <- append(avg_res, 1/mean(ress))
-      } else {
-        avg_res <- append(avg_res, NA)
-      }
-      
+      props_list[[i]] <- props
+      avg_res_list[[i]] <- avg_res
+      overs_list[[i]] <- overs
     }
-    props_list[[i]] <- props
-    avg_res_list[[i]] <- avg_res
-    overs_list[[i]] <- overs
-  }
-  props_means[[length(props_means) + 1]] <- apply(do.call(rbind, props_list), 2, cond_mean)
-  avg_res_means[[length(avg_res_means) + 1]] <- apply(do.call(rbind, avg_res_list), 2, cond_mean)
-  overs_means[[length(overs_means) + 1]] <- apply(do.call(rbind, overs_list), 2, cond_mean) / length(tri)
-  
-  for (i in 1:length(props_means)) {
-    if (is.nan(props_means[[length(props_means)]][i])) props_means[i] <- NA
-    if (is.nan(avg_res_means[[length(avg_res_means)]][i])) avg_res_means[i] <- NA
-    if (is.nan(overs_means[[length(overs_means)]][i])) overs_means[i] <- NA
+    props_means[[lambda]][[length(props_means) + 1]] <- apply(do.call(rbind, props_list), 2, cond_mean)
+    avg_res_means[[lambda]][[length(avg_res_means) + 1]] <- apply(do.call(rbind, avg_res_list), 2, cond_mean)
+    overs_means[[lambda]][[length(overs_means) + 1]] <- apply(do.call(rbind, overs_list), 2, cond_mean) / length(tri)
+    
+    for (i in 1:length(props_means)) {
+      if (is.nan(props_means[[lambda]][[length(props_means)]][i])) props_means[i] <- NA
+      if (is.nan(avg_res_means[[lambda]][[length(avg_res_means)]][i])) avg_res_means[i] <- NA
+      if (is.nan(overs_means[[lambda]][[length(overs_means)]][i])) overs_means[i] <- NA
+    }
   }
 }
 
